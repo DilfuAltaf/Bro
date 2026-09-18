@@ -1,0 +1,11 @@
+{
+  "name": "@bro/agent",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "python -m uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload",
+    "lint": "python -m uv run ruff check .",
+    "test": "python -m uv run pytest",
+    "build": "python -m uv sync --frozen"
+  }
+}
