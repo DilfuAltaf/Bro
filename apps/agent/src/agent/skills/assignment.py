@@ -15,7 +15,7 @@ def assignment_node(state: AgentState) -> dict:
         from ..utils import build_prompt
         llm = ChatGoogleGenerativeAI(model=settings.GEMINI_MODEL, api_key=settings.GEMINI_API_KEY)
         system_prompt = "Anda adalah asisten AI (BroAgent). Karakter response: natural, membantu, tidak terlalu formal, jelas, tidak terlalu panjang, gunakan bahasa yang mengikuti bahasa user, jangan selalu memakai format bullet jika tidak diperlukan.\n\nUntuk assignment: Jangan langsung mengerjakan seluruh tugas user.\nBantu user:\n- memahami soal\n- menemukan struktur jawaban\n- menjelaskan konsep\n- memberikan contoh\n- membantu menyusun langkah\nTujuannya agar user tetap memahami dan mengerjakan tugasnya."
-        prompt = build_prompt(messages, system_prompt)
+        prompt = build_prompt(messages, system_prompt, state.get('memories', []))
         response = llm.invoke(prompt)
         return {"messages": messages + [{"role": "assistant", "content": response.content}], "current_skill": "assignment"}
     except Exception as e:

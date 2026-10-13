@@ -18,11 +18,29 @@ AI Personal Education Agent — satu agent dengan banyak kemampuan dalam satu pe
 | Layer | Technology |
 |---|---|
 | Frontend | Next.js 15 + TypeScript + Tailwind CSS v4 |
-| Backend API | NestJS + TypeScript + Prisma |
-| Database | XAMPP MySQL/MariaDB |
-| AI Agent | Python + FastAPI + LangGraph |
-| LLM | Gemini 2.0 Flash (Google AI) |
+| Backend API | NestJS + TypeScript + Supabase |
+| LLM | Google Gemini + Groq (bisa dipilih user, OpenAI-compatible endpoint) |
+| Voice input | Speech-to-text browser-native di kolom chat (ngomong → teks) |
+| Database | Supabase (Postgres) |
 | Monorepo | Turborepo + pnpm |
+
+## 🏗️ Architecture
+
+```text
+Next.js Web
+      ↓
+NestJS API (Safety Check → Memory Retrieval → Gemini)
+      ↓
+Google Gemini  (generativelanguage.googleapis.com, OpenAI-compatible)
+      ↓
+Streaming tokens → client (SSE)
+```
+
+**Responsibilities:**
+- **Next.js**: Frontend UI (consumes the SSE chat stream)
+- **NestJS**: Application backend, auth, conversations, memory, safety boundary, Gemini client, research adapter
+- **Gemini / Groq**: LLM provider yang bisa dipilih user dari dropdown model di chat
+- **Research Tools**: Real web search via the Python agent's `ResearchTool` (DuckDuckGo / Tavily)
 
 ## 📁 Project Structure
 
@@ -31,9 +49,8 @@ bro-agent/
 ├── apps/
 │   ├── web/          # 🌐 Next.js Frontend
 │   ├── api/          # ⚙️ NestJS Backend
-│   └── agent/        # 🧠 Python AI Agent
+│   └── agent/        # 🧠 Python AI Agent (research adapter)
 ├── packages/
-│   ├── database/     # 🗄️ Prisma Schema (MySQL)
 │   ├── shared-types/ # 📦 Shared TypeScript Types
 │   └── tsconfig/     # ⚙️ Shared TS Configs
 └── README.md
@@ -47,7 +64,6 @@ bro-agent/
 - Python 3.12+
 - pnpm (`npm install -g pnpm`)
 - uv (`pip install uv`)
-- XAMPP (MySQL)
 
 ### 1. Install Dependencies
 
@@ -59,21 +75,19 @@ pnpm install
 cd apps/agent && python -m uv sync
 ```
 
-### 2. Setup Database
+### 2. Setup Database (Supabase)
 
-1. Start **XAMPP** → Start **MySQL**
-2. Open **phpMyAdmin** → Create database `bro_agent`
-3. Push Prisma schema:
-
-```bash
-pnpm db:push
-```
+Create the tables once in the Supabase Dashboard → SQL Editor by running
+`scripts/supabase_schema.sql` from this repo (creates `User`,
+`ConversationThread`, `Message`, `Memory`, and `WorkflowRun` with RLS enabled).
+No local database is required.
 
 ### 3. Configure Environment
 
 ```bash
 cp .env.example .env
-# Edit .env — add your GEMINI_API_KEY from https://aistudio.google.com
+# Edit .env — set GEMINI_API_KEY (get one from https://aistudio.google.com/apikey)
+# GEMINI_MODEL defaults to gemini-flash-latest.
 ```
 
 ### 4. Run Development
@@ -93,11 +107,28 @@ pnpm --filter @bro/web dev
 
 Then open: **http://localhost:3000**
 
-## 🔑 API Keys
+## 🔑 Configuration
 
-| Service | Sign Up | Free Tier |
+BroAgent talks directly to Google Gemini through its OpenAI-compatible endpoint.
+Get an API key from [Google AI Studio](https://aistudio.google.com/apikey) and set
+`GEMINI_API_KEY` in `.env`. `GEMINI_MODEL` defaults to `gemini-3.5-flash-lite`.
+
+> **Free tier:** the free tier has a low daily request cap (e.g. 20/day per model
+> for some models). If you hit quota limits, enable billing or switch `GEMINI_MODEL`.
+
+| Service | Sign Up | Usage |
 |---|---|---|
-| [Google AI Studio](https://aistudio.google.com) | Gemini 2.0 Flash | 15 RPM, 1M TPM |
+| [Google AI Studio](https://aistudio.google.com/apikey) | Gemini API Key | Chat + research (required) |
+| [Groq Console](https://console.groq.com/keys) | Groq API Key | Model Groq di dropdown chat (optional) |
+
+## 🔍 Health check
+
+```bash
+curl -s http://127.0.0.1:4000/gemini/health
+```
+
+Reports the configured Gemini model and whether the endpoint is reachable.
+Returns no credentials.
 
 ## 📄 License
 

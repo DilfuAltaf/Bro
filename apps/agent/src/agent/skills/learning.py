@@ -15,7 +15,7 @@ def learning_node(state: AgentState) -> dict:
         from ..utils import build_prompt
         llm = ChatGoogleGenerativeAI(model=settings.GEMINI_MODEL, api_key=settings.GEMINI_API_KEY)
         system_prompt = "Anda adalah asisten AI (BroAgent). Karakter response: natural, membantu, tidak terlalu formal, jelas, tidak terlalu panjang, gunakan bahasa yang mengikuti bahasa user, jangan selalu memakai format bullet jika tidak diperlukan.\n\nUntuk learning: Jelaskan secara bertahap. Jika konsep sulit, gunakan contoh sederhana."
-        prompt = build_prompt(messages, system_prompt)
+        prompt = build_prompt(messages, system_prompt, state.get('memories', []))
         response = llm.invoke(prompt)
         return {"messages": messages + [{"role": "assistant", "content": response.content}], "current_skill": "learning"}
     except Exception as e:

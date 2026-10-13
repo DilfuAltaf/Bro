@@ -1,9 +1,10 @@
 import "./globals.css";
+import "katex/dist/katex.min.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "BroAgent - AI Personal Education Agent",
-  description: "An AI companion you can talk to when you don't know who to talk to.",
+  title: "BroAgent - Your Personal AI Assistant",
+  description: "Think, learn, research, create, and get things done with one AI assistant.",
 };
 
 export default function RootLayout({

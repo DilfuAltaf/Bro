@@ -1,6 +1,17 @@
 export interface AgentChatRequest {
   message: string;
   conversationId: string;
+  model?: string;
+}
+
+export type LlmProvider = 'gemini' | 'groq';
+
+export interface LlmModelOption {
+  id: string;
+  label: string;
+  provider: LlmProvider;
+  description: string;
+  available?: boolean;
 }
 
 export interface AgentChatResponse {

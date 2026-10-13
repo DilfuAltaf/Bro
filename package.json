@@ -8,10 +8,6 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
-    "db:generate": "pnpm --filter @bro/database generate",
-    "db:push": "pnpm --filter @bro/database push",
-    "db:migrate": "pnpm --filter @bro/database migrate",
-    "db:studio": "pnpm --filter @bro/database studio",
     "clean": "turbo clean"
   },
   "devDependencies": {

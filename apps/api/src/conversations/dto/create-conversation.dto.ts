@@ -1,11 +1,15 @@
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateConversationDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  userId: string;
+  userId?: string;
 
   @IsOptional()
   @IsString()
   title?: string;
+
+  @IsOptional()
+  @IsString()
+  mode?: string;
 }

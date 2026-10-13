@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "python -m uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload",
-    "lint": "python -m uv run ruff check .",
-    "test": "python -m uv run pytest",
+    "dev": ".venv\\Scripts\\python.exe -m uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload",
+    "lint": ".venv\\Scripts\\python.exe -m ruff check .",
+    "test": ".venv\\Scripts\\python.exe -m pytest",
     "build": "python -m uv sync --frozen"
   }
 }

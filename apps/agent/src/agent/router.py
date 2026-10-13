@@ -15,7 +15,7 @@ def classify_intent(state: AgentState) -> dict:
         from .utils import build_prompt
         llm = ChatGoogleGenerativeAI(model=settings.GEMINI_MODEL, api_key=settings.GEMINI_API_KEY)
         system_prompt = "Klasifikasikan niat pengguna ke dalam salah satu dari kategori berikut secara ketat: general, support, research, brainstorm, learning, assignment. Hanya jawab dengan SATU kata (nama kategori)."
-        prompt = build_prompt(messages, system_prompt)
+        prompt = build_prompt(messages, system_prompt, state.get('memories', []))
         response = llm.invoke(prompt)
         intent = response.content.strip().lower()
         

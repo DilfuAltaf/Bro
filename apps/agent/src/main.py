@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -18,14 +18,21 @@ class ChatMessage(BaseModel):
     role: str
     content: str
 
+class MemoryItem(BaseModel):
+    id: str
+    content: str
+    type: str
+
 class ChatRequest(BaseModel):
     message: str
     conversationId: str
     history: Optional[list[ChatMessage]] = []
+    memories: Optional[list[MemoryItem]] = []
 
 class ChatResponse(BaseModel):
     response: str
     intent: str
+    sources: Optional[list[dict]] = None
 
 @app.post("/agent/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -39,15 +46,25 @@ async def chat(request: ChatRequest):
         # Append current message
         messages.append({"role": "user", "content": request.message})
 
+        # Convert memories
+        memories = [{"id": m.id, "content": m.content, "type": m.type} for m in request.memories] if request.memories else []
+
         result = await agent_graph.ainvoke({
             "messages": messages,
             "current_skill": "general",
             "safety_flag": False,
+            "memories": memories,
         })
 
+        # Extract final message — handle both dict and LangChain message objects
         final_message = ""
         if result.get("messages"):
-            final_message = result["messages"][-1].get("content", "")
+            last_msg = result["messages"][-1]
+            if isinstance(last_msg, dict):
+                final_message = last_msg.get("content", "")
+            elif hasattr(last_msg, "content"):
+                # LangChain BaseMessage object
+                final_message = last_msg.content
         
         if not final_message:
             final_message = "Maaf, saya tidak dapat merespons saat ini."
@@ -55,11 +72,31 @@ async def chat(request: ChatRequest):
         return ChatResponse(
             response=final_message,
             intent=result.get("current_skill", "general"),
+            sources=result.get("sources", None)
         )
     except Exception as e:
+        # Log error but don't expose internals to client
         print(f"Agent error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return ChatResponse(
+            response="Maaf, aku sedang mengalami masalah. Coba lagi beberapa saat.",
+            intent="general",
+        )
+
+class SearchRequest(BaseModel):
+    query: str
+
+@app.post("/agent/search")
+def search(request: SearchRequest):
+    try:
+        from .agent.tools.search import ResearchTool
+        tool = ResearchTool()
+        results = tool.search(request.query)
+        return {"results": results}
+    except Exception as e:
+        print(f"Search adapter error: {e}")
+        return {"results": []}
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
