@@ -324,6 +324,9 @@ const en: Dict = {
   'settings.defaultBadge': 'default',
   'settings.save': 'Save',
   'settings.cancel': 'Cancel',
+  'history.deleteTitle': 'Delete this chat?',
+  'history.deleteDesc': 'Delete "{title}"? This conversation and all its messages will be permanently removed.',
+  'history.deleteBtn': 'Delete',
 
   'attach.title': 'Attach',
   'attach.photo': 'Photos & Gallery',
@@ -518,6 +521,9 @@ const id: Dict = {
   'settings.defaultBadge': 'default',
   'settings.save': 'Simpan',
   'settings.cancel': 'Batal',
+  'history.deleteTitle': 'Hapus chat ini?',
+  'history.deleteDesc': 'Hapus "{title}"? Percakapan dan semua pesannya akan dihapus permanen.',
+  'history.deleteBtn': 'Hapus',
 
   'attach.title': 'Lampirkan',
   'attach.photo': 'Foto & Galeri',
@@ -712,6 +718,9 @@ const ar: Dict = {
   'settings.defaultBadge': 'افتراضي',
   'settings.save': 'حفظ',
   'settings.cancel': 'إلغاء',
+  'history.deleteTitle': 'حذف هذه المحادثة؟',
+  'history.deleteDesc': 'حذف "{title}"؟ سيتم حذف المحادثة وكل رسائلها نهائياً.',
+  'history.deleteBtn': 'حذف',
 
   'attach.title': 'إرفاق',
   'attach.photo': 'الصور والمعرض',
@@ -906,6 +915,9 @@ const ru: Dict = {
   'settings.defaultBadge': 'по умолч.',
   'settings.save': 'Сохранить',
   'settings.cancel': 'Отмена',
+  'history.deleteTitle': 'Удалить этот чат?',
+  'history.deleteDesc': 'Удалить "{title}"? Переписка и все сообщения будут удалены навсегда.',
+  'history.deleteBtn': 'Удалить',
 
   'attach.title': 'Прикрепить',
   'attach.photo': 'Фото и галерея',
@@ -1100,6 +1112,9 @@ const zh: Dict = {
   'settings.defaultBadge': '默认',
   'settings.save': '保存',
   'settings.cancel': '取消',
+  'history.deleteTitle': '删除这个对话？',
+  'history.deleteDesc': '删除“{title}”？该对话及所有消息将被永久删除。',
+  'history.deleteBtn': '删除',
 
   'attach.title': '添加附件',
   'attach.photo': '照片与相册',
@@ -1294,6 +1309,9 @@ const ja: Dict = {
   'settings.defaultBadge': '既定',
   'settings.save': '保存',
   'settings.cancel': 'キャンセル',
+  'history.deleteTitle': 'このチャットを削除しますか？',
+  'history.deleteDesc': '「{title}」を削除します。この会話と全メッセージが完全に消えます。',
+  'history.deleteBtn': '削除',
 
   'attach.title': '添付',
   'attach.photo': '写真・ギャラリー',
@@ -1488,6 +1506,9 @@ const ko: Dict = {
   'settings.defaultBadge': '기본',
   'settings.save': '저장',
   'settings.cancel': '취소',
+  'history.deleteTitle': '이 채팅을 삭제할까요?',
+  'history.deleteDesc': '"{title}"을(를) 삭제할까요? 대화와 모든 메시지가 영구 삭제됩니다.',
+  'history.deleteBtn': '삭제',
 
   'attach.title': '첨부',
   'attach.photo': '사진 및 갤러리',

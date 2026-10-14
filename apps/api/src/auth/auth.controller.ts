@@ -22,12 +22,7 @@ export class AuthController {
 
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
+    res.clearCookie('token', this.cookieOpts());
     return { success: true };
   }
 
@@ -61,12 +56,7 @@ export class AuthController {
   async deleteAccount(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const userId = this.requireUserId(req);
     const result = await this.authService.deleteAccount(userId);
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
+    res.clearCookie('token', this.cookieOpts());
     return result;
   }
 
@@ -81,11 +71,33 @@ export class AuthController {
 
   private setCookie(res: Response, token: string) {
     res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Use 'none' if frontend and backend are on different domains
+      ...this.cookieOpts(),
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/',
     });
+  }
+
+  /**
+   * Opsi cookie auth terpusat (set & clear HARUS sama, kalau tidak
+   * browser menolak menghapus cookie saat logout/hapus akun).
+   *
+   * - Production (frontend & backend beda domain, mis. Vercel + Railway):
+   *   SameSite=None + Secure, kalau tidak browser tidak akan mengirim
+   *   cookie cross-site dan semua request auth bakal 401.
+   * - Dev localhost (http): tetap Lax + non-secure karena cookie Secure
+   *   ditolak di http://localhost.
+   * - Override manual via COOKIE_SAMESITE=lax|none bila diperlukan.
+   */
+  private cookieOpts(): { httpOnly: boolean; secure: boolean; sameSite: 'lax' | 'none'; path: string } {
+    const isProd = process.env.NODE_ENV === 'production';
+    const override = (process.env.COOKIE_SAMESITE || '').trim().toLowerCase();
+    const sameSite: 'lax' | 'none' =
+      override === 'none' || override === 'lax'
+        ? override
+        : isProd
+          ? 'none'
+          : 'lax';
+    // SameSite=None wajib Secure; di dev http paksa non-secure.
+    const secure = sameSite === 'none' ? true : isProd;
+    return { httpOnly: true, secure, sameSite, path: '/' };
   }
 }

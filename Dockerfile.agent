@@ -1,0 +1,16 @@
+# ---- BroAgent Agent (Python FastAPI) — Railway / Render / VPS via Docker ----
+# Dipakai HANYA untuk web-search mode riset (POST /agent/search dari API).
+# Build context: repo root.  Contoh:
+#   docker build -f Dockerfile.agent -t bro-agent .
+#   docker run -p 8000:8000 --env-file .env bro-agent
+
+FROM python:3.12-slim AS run
+WORKDIR /app
+RUN pip install --no-cache-dir uv
+COPY apps/agent/pyproject.toml apps/agent/uv.lock ./
+RUN uv sync --frozen --no-dev
+COPY apps/agent/src ./src
+ENV PORT=8000
+EXPOSE 8000
+# $PORT di-inject host (Railway/Render); default 8000 untuk lokal/VPS.
+CMD ["sh", "-c", "uv run uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

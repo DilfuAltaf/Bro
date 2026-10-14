@@ -1,21 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { MessageSquarePlus, Clock, Settings, LogOut, UserCircle, Pencil, Trash2, Check, X } from 'lucide-react';
+import { MessageSquarePlus, Clock, Settings, LogOut, UserCircle, Pencil, Trash2, Check, X, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SettingsModal from './SettingsModal';
-import { useAppLanguage } from '@/lib/i18n';
+import { tx, useAppLanguage } from '@/lib/i18n';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function Sidebar() {
-  const { tt } = useAppLanguage();
+  const { lang, tt } = useAppLanguage();
   const [user, setUser] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Target hapus yang menunggu konfirmasi (tidak langsung hapus).
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
 
   const loadHistory = () => {
@@ -48,11 +51,13 @@ export default function Sidebar() {
   };
 
   const handleDelete = async (id: string) => {
+    setDeleting(true);
     try {
-      await fetch(`${API_URL}/conversations/${id}`, {
+      const res = await fetch(`${API_URL}/conversations/${id}`, {
         method: 'DELETE',
         credentials: 'include'
       });
+      if (!res.ok) throw new Error('Delete failed');
       setHistory(prev => prev.filter(c => c.id !== id));
       
       // If we are currently on the deleted chat, redirect to /chat
@@ -60,10 +65,23 @@ export default function Sidebar() {
       if (urlParams.get('conversationId') === id) {
         router.push('/chat');
       }
+      setDeleteTarget(null);
     } catch (err) {
       console.error(err);
+    } finally {
+      setDeleting(false);
     }
   };
+
+  // Tutup modal konfirmasi dengan Escape.
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDeleteTarget(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [deleteTarget]);
 
   useEffect(() => {
     fetch(`${API_URL}/auth/me`, { credentials: 'include' })
@@ -174,7 +192,7 @@ export default function Sidebar() {
                       </button>
                       <button onClick={(e) => {
                         e.preventDefault();
-                        handleDelete(conv.id);
+                        setDeleteTarget({ id: conv.id, title: conv.title || 'Conversation' });
                       }} className="text-[#8B8B98] hover:text-red-400 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -221,6 +239,46 @@ export default function Sidebar() {
         )}
       </div>
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* Modal konfirmasi hapus history */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => { if (!deleting) setDeleteTarget(null); }}
+        >
+          <div
+            className="w-full max-w-sm bg-[#111116] border border-[#24242D] rounded-2xl shadow-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="p-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                <TriangleAlert className="w-4 h-4 text-red-400" />
+              </span>
+              <h2 className="text-base font-semibold text-[#F5F5F5]">{tt('history.deleteTitle')}</h2>
+            </div>
+            <p className="text-sm text-[#8B8B98] mb-5">
+              {tx(lang, 'history.deleteDesc', { title: deleteTarget.title })}
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm rounded-lg border border-[#24242D] text-[#8B8B98] hover:text-[#F5F5F5] hover:border-[#8B8B98] transition-colors disabled:opacity-50"
+              >
+                {tt('settings.cancel')}
+              </button>
+              <button
+                onClick={() => void handleDelete(deleteTarget.id)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {deleting ? '...' : tt('history.deleteBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
