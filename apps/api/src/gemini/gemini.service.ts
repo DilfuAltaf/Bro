@@ -21,6 +21,37 @@ export interface GeminiChatResult {
   model: string;
 }
 
+export interface GeminiStreamHooks {
+  /** Dipanggil tepat saat fase pencarian/reading benar-benar terjadi (research mode). */
+  onPhase?: (phase: 'searching' | 'reading') => void;
+  /** Diisi daftar sumber web riil yang dipakai turn ini (untuk event `done`). */
+  sources?: GeminiSource[];
+}
+
+/** URL http(s) valid saja yang boleh diteruskan ke frontend sebagai sumber. */
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || !value) return false;
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** Normalisasi URL untuk deduplikasi (lowercase + tanpa trailing slash). */
+function normalizeUrl(value: string): string {
+  const t = value.trim();
+  try {
+    const u = new URL(t);
+    u.hash = '';
+    const s = u.toString().replace(/\/$/, '');
+    return s.toLowerCase();
+  } catch {
+    return t.toLowerCase();
+  }
+}
+
 export interface GeminiHealth {
   reachable: boolean;
   baseUrl: string;
@@ -56,6 +87,15 @@ export const RESEARCH_CHARS_PER_SOURCE = 600;
 export function truncateForLlm(text: string, maxChars: number): string {
   if (!text || text.length <= maxChars) return text || '';
   return `${text.slice(0, maxChars).trimEnd()}\n...[dipotong agar hemat kuota]`;
+}
+
+/** Host dari URL (fallback judul bila adapter tidak memberi title). */
+function hostOf(value: string): string {
+  try {
+    return new URL(value.trim()).hostname.replace(/^www\./, '') || value.trim();
+  } catch {
+    return value.trim();
+  }
 }
 
 /** True kalau ada pesan multimodal berisi gambar (format OpenAI image_url). */
@@ -126,9 +166,150 @@ export const LLM_MODEL_CATALOG: LlmModelOption[] = [
 ];
 
 const PERSONA =
-  'Anda adalah BroAgent, asisten AI yang ramah dan membantu untuk kaum pelajar Indonesia. ' +
-  'Karakter jawaban: natural, hangat, membantu, jelas, tidak terlalu formal, tidak terlalu panjang, ' +
-  'mengikuti bahasa yang dipakai user, dan tidak selalu memakai format bullet jika tidak diperlukan.';
+  'You are BroAgent, a friendly and helpful personal AI assistant. ' +
+  'Answer style: natural, warm, helpful, clear, not overly formal, not overly long, ' +
+  'and do not always use bullet formatting when it is not needed.';
+
+export const DEFAULT_LANGUAGE = 'en';
+
+/** Bahasa yang didukung BroAgent (UI + jawaban AI). Default: English. */
+export const SUPPORTED_LANGUAGES = ['en', 'ar', 'id', 'ru', 'zh', 'ja', 'ko'] as const;
+export type AppLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+
+export const LANGUAGE_NAMES: Record<AppLanguage, string> = {
+  en: 'English',
+  ar: 'Arabic (العربية)',
+  id: 'Indonesian (Bahasa Indonesia)',
+  ru: 'Russian (Русский)',
+  zh: 'Chinese Simplified (简体中文)',
+  ja: 'Japanese (日本語)',
+  ko: 'Korean (한국어)',
+};
+
+/** Normalisasi kode bahasa apa pun menjadi salah satu yang didukung (fallback: en). */
+export function normalizeLanguage(value: unknown): AppLanguage {
+  if (typeof value !== 'string') return DEFAULT_LANGUAGE as AppLanguage;
+  const v = value.trim().toLowerCase();
+  // Terima varian umum: en-US -> en, zh-CN -> zh, id-ID -> id, dll.
+  const base = v.split(/[-_]/)[0];
+  const map: Record<string, AppLanguage> = {
+    en: 'en',
+    english: 'en',
+    ar: 'ar',
+    arabic: 'ar',
+    arab: 'ar',
+    id: 'id',
+    in: 'id',
+    indonesia: 'id',
+    indonesian: 'id',
+    ru: 'ru',
+    russian: 'ru',
+    rusia: 'ru',
+    zh: 'zh',
+    cn: 'zh',
+    chinese: 'zh',
+    china: 'zh',
+    mandarin: 'zh',
+    ja: 'ja',
+    jp: 'ja',
+    japan: 'ja',
+    japanese: 'ja',
+    ko: 'ko',
+    kr: 'ko',
+    korean: 'ko',
+    korea: 'ko',
+  };
+  return map[v] || map[base || ''] || (DEFAULT_LANGUAGE as AppLanguage);
+}
+
+const PREFERRED_LANGUAGE_NAMES: Record<AppLanguage, string> = {
+  en: 'English',
+  ar: 'Modern Standard Arabic',
+  id: 'Bahasa Indonesia',
+  ru: 'Russian',
+  zh: 'Simplified Chinese',
+  ja: 'Japanese',
+  ko: 'Korean',
+};
+
+/** Untuk apa user memakai BroAgent (dipilih saat onboarding, bisa diubah di Settings). */
+export const SUPPORTED_PURPOSES = [
+  'work',
+  'study',
+  'personal',
+  'developer',
+  'creator',
+  'research',
+] as const;
+export type AppPurpose = (typeof SUPPORTED_PURPOSES)[number];
+
+/** Normalisasi input apa pun menjadi purpose valid, atau null (netral) bila tak dikenal. */
+export function normalizePurpose(value: unknown): AppPurpose | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim().toLowerCase();
+  const map: Record<string, AppPurpose> = {
+    work: 'work', kerja: 'work', pekerjaan: 'work', career: 'work', karier: 'work', karir: 'work',
+    business: 'work', bisnis: 'work', job: 'work',
+    study: 'study', pelajar: 'study', student: 'study', belajar: 'study',
+    sekolah: 'study', school: 'study', kuliah: 'study', college: 'study',
+    personal: 'personal', pribadi: 'personal', daily: 'personal', harian: 'personal',
+    casual: 'personal', santai: 'personal',
+    developer: 'developer', dev: 'developer',
+    programmer: 'developer', ngoding: 'developer', coding: 'developer',
+    creator: 'creator', kreator: 'creator', konten: 'creator', content: 'creator',
+    influencer: 'creator',
+    research: 'research', peneliti: 'research', riset: 'research',
+    researcher: 'research',
+  };
+  return map[v] || null;
+}
+
+/** Mode chat default per purpose (dipakai saat pesan tanpa mode eksplisit). */
+const PURPOSE_DEFAULT_MODES: Record<AppPurpose, Mode> = {
+  work: 'assignment',
+  study: 'learning',
+  personal: 'general',
+  developer: 'general',
+  creator: 'brainstorm',
+  research: 'research',
+};
+
+export function purposeDefaultMode(purpose: AppPurpose | null): Mode {
+  return (purpose && PURPOSE_DEFAULT_MODES[purpose]) || 'general';
+}
+
+/** Lapisan gaya persona per purpose (selalu dalam English agar semua model paham). */
+const PURPOSE_STYLES: Record<AppPurpose, string> = {
+  work: 'The user mainly uses BroAgent for WORK: be concise, professional, and structured. Prioritize actionable next steps and skip small talk.',
+  study: 'The user mainly uses BroAgent for STUDYING: act like a patient tutor. Explain step by step from the basics, use simple examples and analogies, and check understanding when relevant.',
+  personal: 'The user mainly uses BroAgent for PERSONAL daily use: be warm, casual, and friendly, like a helpful everyday companion.',
+  developer: 'The user mainly uses BroAgent for SOFTWARE DEVELOPMENT: be code-first. Give runnable code examples, mention the language/version when relevant, and keep a concise technical tone.',
+  creator: 'The user mainly uses BroAgent for CONTENT CREATION: be idea-rich. Offer angles, hooks, and platform-appropriate variants, and help refine drafts.',
+  research: 'The user mainly uses BroAgent for RESEARCH: be evidence-focused. Distinguish facts from interpretation, note uncertainties, and never invent sources.',
+};
+
+export function purposeStyle(purpose: AppPurpose | null): string | null {
+  return (purpose && PURPOSE_STYLES[purpose]) || null;
+}
+
+/**
+ * Bahasa pilihan user = DEFAULT. Tapi kalau pesan terakhir user jelas-jelas
+ * ditulis dalam bahasa lain (mis. UI Jepang tapi prompt bahasa Inggris),
+ * AI WAJIB ngikutin bahasa prompt tersebut — jawab seluruhnya dalam bahasa itu.
+ * Hanya pindah bahasa kalau pilihan user ambigu/tidak jelas → tetap default.
+ */
+function languageInstruction(lang: AppLanguage): string {
+  const pref = PREFERRED_LANGUAGE_NAMES[lang];
+  return (
+    `The user's preferred language is ${pref}. Respond in ${pref} by default. ` +
+    `IMPORTANT: if the user's latest message is clearly written in a different language, ` +
+    `mirror THAT language instead and answer entirely in it ` +
+    `(for example, a message written in English gets a fully English answer even when the preferred language is ${pref}; ` +
+    `a message written in Japanese gets a fully Japanese answer). ` +
+    `Only switch languages when the user's choice is unambiguous; otherwise stay in ${pref}. ` +
+    `Never mix two languages in one answer unless the user explicitly asks for it.`
+  );
+}
 
 const OUTPUT_FORMATTING =
   'Format jawaban memakai Markdown (GitHub Flavored) yang bersih karena jawaban dirender ' +
@@ -218,6 +399,59 @@ You are assisting with document analysis.
 - If no document context is provided, clearly inform the user that a document or text is needed. Do not pretend you have read a file.`,
 };
 
+/** Deskripsi katalog model per bahasa UI (default English). */
+const MODEL_DESCRIPTIONS: Record<AppLanguage, Record<string, string>> = {
+  en: {
+    'gemini-3.5-flash-lite': 'Fast & quota-friendly, great for daily chat',
+    'gemini-2.5-flash': 'Smarter for reasoning & documents',
+    'qwen/qwen3.8-27b': 'Versatile & multilingual via Groq',
+    'openai/gpt-oss-120b': 'Flagship open-weight, reasoning + code',
+    'openai/gpt-oss-20b': 'Light & fast (~1000 tps) via Groq',
+  },
+  id: {
+    'gemini-3.5-flash-lite': 'Cepat & hemat kuota, cocok untuk chat harian',
+    'gemini-2.5-flash': 'Lebih pintar untuk reasoning & dokumen',
+    'qwen/qwen3.8-27b': 'Serbaguna & multibahasa via Groq',
+    'openai/gpt-oss-120b': 'Open-weight flagship, bisa reasoning + code',
+    'openai/gpt-oss-20b': 'Ringan & cepat (~1000 tps) via Groq',
+  },
+  ar: {
+    'gemini-3.5-flash-lite': 'سريع وموفّر للحصة، مناسب للدردشة اليومية',
+    'gemini-2.5-flash': 'أذكى للاستدلال والمستندات',
+    'qwen/qwen3.8-27b': 'متعدد الاستخدامات ومتعدد اللغات عبر Groq',
+    'openai/gpt-oss-120b': 'الأقوى مفتوح الأوزان، استدلال + برمجة',
+    'openai/gpt-oss-20b': 'خفيف وسريع (~1000 رمز/ث) عبر Groq',
+  },
+  ru: {
+    'gemini-3.5-flash-lite': 'Быстрая и экономная, для ежедневного чата',
+    'gemini-2.5-flash': 'Умнее для рассуждений и документов',
+    'qwen/qwen3.8-27b': 'Универсальная и многоязычная via Groq',
+    'openai/gpt-oss-120b': 'Флагман open-weight: рассуждения + код',
+    'openai/gpt-oss-20b': 'Лёгкая и быстрая (~1000 ток/с) via Groq',
+  },
+  zh: {
+    'gemini-3.5-flash-lite': '快速省配额，适合日常聊天',
+    'gemini-2.5-flash': '推理和文档更聪明',
+    'qwen/qwen3.8-27b': '多功能多语言 (Groq)',
+    'openai/gpt-oss-120b': '旗舰开源权重，推理 + 代码',
+    'openai/gpt-oss-20b': '轻量快速 (~1000 tps, Groq)',
+  },
+  ja: {
+    'gemini-3.5-flash-lite': '高速・省 quota、日常チャットに最適',
+    'gemini-2.5-flash': '推論・文書に強い',
+    'qwen/qwen3.8-27b': '多機能・多言語 (Groq)',
+    'openai/gpt-oss-120b': '旗艦オープンウェイト、推論 + コード',
+    'openai/gpt-oss-20b': '軽量・高速 (~1000 tps, Groq)',
+  },
+  ko: {
+    'gemini-3.5-flash-lite': '빠르고 할당량 절약, 일상 채팅에 최적',
+    'gemini-2.5-flash': '추론과 문서에 더 스마트',
+    'qwen/qwen3.8-27b': '다재다능·다국어 (Groq)',
+    'openai/gpt-oss-120b': '플래그십 오픈 웨이트, 추론 + 코드',
+    'openai/gpt-oss-20b': '가볍고 빠름 (~1000 tps, Groq)',
+  },
+};
+
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
@@ -275,9 +509,12 @@ export class GeminiService {
   }
 
   /** Daftar model untuk dropdown frontend, lengkap dengan status ketersediaan key. */
-  listModels(): Array<LlmModelOption & { available: boolean }> {
+  listModels(lang?: string): Array<LlmModelOption & { available: boolean }> {
+    const L = normalizeLanguage(lang);
+    const desc = MODEL_DESCRIPTIONS[L] || MODEL_DESCRIPTIONS.en!;
     return LLM_MODEL_CATALOG.map((m) => ({
       ...m,
+      description: desc[m.id] || m.description,
       available: m.provider === 'gemini' ? Boolean(this.apiKey) : Boolean(this.groqApiKey),
     }));
   }
@@ -353,7 +590,7 @@ export class GeminiService {
   /** Pesan akhir saat semua model habis / error non-kuota. */
   private exhaustedMessage(error: any, didFallback: boolean, provider: LlmProvider): string {
     if (didFallback && GeminiService.isCapacityError(error)) {
-      return 'Semua model AI sedang limit. Tunggu sebentar lalu coba lagi, atau coba besok.';
+      return 'All AI models are currently rate-limited. Please wait a moment and try again.';
     }
     return GeminiService.friendlyError(error, provider);
   }
@@ -417,8 +654,12 @@ export class GeminiService {
     memories: GeminiMemoryItem[] = [],
     mode?: string,
     requestedModel?: string,
+    language?: string,
+    purpose?: string | null,
   ): Promise<GeminiChatResult> {
-    const validatedMode = this.normalizeMode(mode);
+    const validatedPurpose = normalizePurpose(purpose);
+    const validatedMode = this.normalizeMode(mode, validatedPurpose);
+    const validatedLang = normalizeLanguage(language);
     // Model Groq saat ini text-only — kalau ada gambar, paksa ke Gemini (vision).
     const wantsVision = hasImageParts(messages);
     const first = wantsVision
@@ -437,7 +678,7 @@ export class GeminiService {
     }
 
     const sources = await this.maybeResearch(validatedMode, history);
-    const systemPrompt = this.buildSystemPrompt(memories, sources, validatedMode);
+    const systemPrompt = this.buildSystemPrompt(memories, sources, validatedMode, validatedLang, validatedPurpose);
 
     let lastError: any = null;
     let lastProvider: LlmProvider = first.provider;
@@ -455,7 +696,7 @@ export class GeminiService {
         this.logUsage(provider, model, (completion as any)?.usage);
         const content = completion.choices[0]?.message?.content?.trim();
         return {
-          response: content || 'Maaf, saya tidak dapat merespons saat ini.',
+          response: content || 'Sorry, I cannot respond right now.',
           intent: validatedMode,
           sources,
           model,
@@ -485,8 +726,13 @@ export class GeminiService {
     mode?: string,
     requestedModel?: string,
     actual?: { modelId?: string },
+    language?: string,
+    purpose?: string | null,
+    hooks?: GeminiStreamHooks,
   ): AsyncGenerator<string> {
-    const validatedMode = this.normalizeMode(mode);
+    const validatedPurpose = normalizePurpose(purpose);
+    const validatedMode = this.normalizeMode(mode, validatedPurpose);
+    const validatedLang = normalizeLanguage(language);
     // Model Groq saat ini text-only — kalau ada gambar, paksa ke Gemini (vision).
     const wantsVision = hasImageParts(messages);
     const first = wantsVision
@@ -504,8 +750,9 @@ export class GeminiService {
       throw new Error('Cannot call Gemini with an empty message list.');
     }
 
-    const sources = await this.maybeResearch(validatedMode, history);
-    const systemPrompt = this.buildSystemPrompt(memories, sources, validatedMode);
+    const sources = await this.maybeResearch(validatedMode, history, hooks?.onPhase);
+    if (hooks) hooks.sources = sources;
+    const systemPrompt = this.buildSystemPrompt(memories, sources, validatedMode, validatedLang, validatedPurpose);
 
     let lastError: any = null;
     let lastProvider: LlmProvider = first.provider;
@@ -554,12 +801,12 @@ export class GeminiService {
   private assertProviderKey(provider: LlmProvider): void {
     if (provider === 'groq' && !this.groqApiKey) {
       throw new Error(
-        'Model Groq dipilih tapi GROQ_API_KEY belum diisi. Isi GROQ_API_KEY di file .env atau pilih model Gemini.',
+        'A Groq model was selected but GROQ_API_KEY is missing. Add GROQ_API_KEY to .env or choose a Gemini model.',
       );
     }
     if (provider === 'gemini' && !this.apiKey) {
       throw new Error(
-        'Model Gemini dipilih tapi GEMINI_API_KEY belum diisi. Periksa GEMINI_API_KEY.',
+        'A Gemini model was selected but GEMINI_API_KEY is missing. Check GEMINI_API_KEY.',
       );
     }
   }
@@ -579,9 +826,16 @@ export class GeminiService {
       if (!res.ok) throw new Error(`research adapter returned HTTP ${res.status}`);
 
       const payload = (await res.json()) as { results?: GeminiSource[] };
-      return (payload.results ?? []).filter(
-        (s): s is GeminiSource => Boolean(s && s.url),
-      );
+      const seen = new Set<string>();
+      const clean: GeminiSource[] = [];
+      for (const s of payload.results ?? []) {
+        if (!s || !isHttpUrl(s.url)) continue;
+        const key = normalizeUrl(s.url);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        clean.push({ title: (s.title || '').trim() || hostOf(s.url), url: s.url.trim(), content: s.content });
+      }
+      return clean;
     } catch (error) {
       this.logger.error(`Web search failed: ${GeminiService.describe(error)}`);
       return [];
@@ -600,12 +854,16 @@ export class GeminiService {
   private async maybeResearch(
     mode: Mode,
     history: Array<{ role: string; content?: any }>,
+    onPhase?: (phase: 'searching' | 'reading') => void,
   ): Promise<GeminiSource[]> {
     if (mode !== 'research') return [];
     const lastUser = [...history].reverse().find((m) => m.role === 'user');
     const query = textOf(lastUser?.content).trim();
     if (!query) return [];
+    // Fase pencarian web riil dimulai — hanya di sini status "searching" boleh diklaim.
+    onPhase?.('searching');
     const results = await this.searchWeb(query);
+    if (results.length > 0) onPhase?.('reading');
     // Batasi jumlah + panjang sumber: isi penuh hasil search bisa ribuan token.
     return results.slice(0, RESEARCH_SOURCE_LIMIT).map((s) => ({
       ...s,
@@ -613,8 +871,10 @@ export class GeminiService {
     }));
   }
 
-  private normalizeMode(mode?: string): Mode {
-    return mode && VALID_MODES.has(mode) ? (mode as Mode) : 'general';
+  private normalizeMode(mode?: string, purpose?: AppPurpose | null): Mode {
+    if (mode && VALID_MODES.has(mode)) return mode as Mode;
+    if (purpose) return purposeDefaultMode(purpose);
+    return 'general';
   }
 
   private cleanHistory(
@@ -635,13 +895,18 @@ export class GeminiService {
     memories: GeminiMemoryItem[],
     sources: GeminiSource[],
     validatedMode: Mode,
+    language: AppLanguage = 'en',
+    purpose: AppPurpose | null = null,
   ): string {
     let prompt = PERSONA;
+    prompt += `\n\n[LANGUAGE: ${LANGUAGE_NAMES[language]}]\n${languageInstruction(language)} Keep this rule for the entire answer unless the user explicitly asks for another language.`;
+    const style = purposeStyle(purpose);
+    if (style) prompt += `\n\n[USER PURPOSE]\n${style}`;
     prompt += `\n\n${MODE_INSTRUCTIONS[validatedMode]}`;
     prompt += `\n\n${OUTPUT_FORMATTING}`;
 
     if (memories.length > 0) {
-      prompt += '\n\nMemori user (gunakan untuk personalisasi, jangan dibocorkan):\n';
+      prompt += '\n\nUser memories (use for personalization, do not leak them):\n';
       for (const memory of memories) {
         prompt += `- ${(memory.type || 'note').toUpperCase()}: ${memory.content}\n`;
       }
@@ -649,9 +914,9 @@ export class GeminiService {
 
     if (sources.length > 0) {
       prompt +=
-        '\n\nRiset web — hasil pencarian nyata yang sudah dijalankan untuk pesan ini. ' +
-        'Jawab HANYA berdasarkan bahan ini, jangan mengarang fakta atau sumber tambahan, ' +
-        'dan tunjukkan kutipan dengan nomor [1], [2], dan seterusnya:\n\n';
+        '\n\nWeb research — real search results already run for this message. ' +
+        'Answer ONLY from this material, do not invent facts or extra sources, ' +
+        'and cite with numbers [1], [2], etc.:\n\n';
       sources.forEach((source, index) => {
         prompt += `[${index + 1}] ${source.title} — ${source.url}\n${
           source.content ?? ''
@@ -659,7 +924,7 @@ export class GeminiService {
       });
     } else {
       prompt +=
-        '\n\nJawab dari pengetahuanmu. Jangan mengarang fakta, statistik, atau tautan sumber.';
+        '\n\nAnswer from your knowledge. Do not invent facts, statistics, or source links.';
     }
 
     return prompt.trim();
@@ -670,7 +935,7 @@ export class GeminiService {
     return String(error);
   }
 
-  /** Translate upstream API failures into short, user-facing Indonesian messages. */
+  /** Translate upstream API failures into short, user-facing English messages (default language). */
   private static friendlyError(error: any, provider: LlmProvider = 'gemini'): string {
     const status = error?.status;
     const raw = typeof error?.message === 'string' ? error.message : String(error);
@@ -678,20 +943,20 @@ export class GeminiService {
 
     if (status === 429 || /quota|RESOURCE_EXHAUSTED|rate_limit|rate limit/i.test(raw)) {
       return provider === 'groq'
-        ? 'Kuota/rate-limit Groq habis. Tunggu sebentar lalu coba lagi, atau ganti ke model Gemini.'
-        : 'Kuota AI harian sudah habis. Coba lagi nanti atau aktifkan billing di Google AI Studio.';
+        ? 'Groq quota/rate-limit exceeded. Wait a moment and try again, or switch to a Gemini model.'
+        : 'Daily AI quota exceeded. Try again later or enable billing in Google AI Studio.';
     }
     if (status === 401 || status === 403 || /api key|UNAUTHENTICATED|invalid authentication|invalid_api_key/i.test(raw)) {
       return provider === 'groq'
-        ? 'Konfigurasi API key Groq bermasalah. Periksa GROQ_API_KEY di file .env.'
-        : 'Konfigurasi API key Gemini bermasalah. Periksa GEMINI_API_KEY.';
+        ? 'Groq API key misconfigured. Check GROQ_API_KEY in the .env file.'
+        : 'Gemini API key misconfigured. Check GEMINI_API_KEY.';
     }
     if (status === 404 || /model_not_found|does not exist|not found/i.test(raw)) {
-      return `Model tidak ditemukan di ${name}. Pilih model lain dari daftar.`;
+      return `Model not found on ${name}. Please choose another model from the list.`;
     }
     if (status === 503 || /UNAVAILABLE|high demand|overloaded/i.test(raw)) {
-      return 'Model AI sedang sibuk. Coba lagi sebentar lagi.';
+      return 'The AI model is busy. Please try again in a moment.';
     }
-    return `Gagal menghubungi AI ${name} (${status ?? 'error'}). Coba lagi sebentar lagi.`;
+    return `Failed to reach ${name} AI (${status ?? 'error'}). Please try again in a moment.`;
   }
 }

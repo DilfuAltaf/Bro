@@ -7,6 +7,7 @@ import {
   prepareFiles,
   prettyBytes,
 } from '@/lib/attachments';
+import { useAppLanguage } from '@/lib/i18n';
 
 // Web Speech API belum ada di lib.dom TS, deklarasikan seperlunya.
 type SpeechRecognitionInstance = {
@@ -43,6 +44,7 @@ type Props = {
 type PreparedAttachment = OutgoingAttachment & { id: string };
 
 export default function ChatInput({ onSend, disabled, lang }: Props) {
+  const { tt, lang: uiLang } = useAppLanguage();
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<PreparedAttachment[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -131,14 +133,14 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
 
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) {
-      setSttError('Browser ini tidak mendukung voice-to-text. Coba Chrome/Edge desktop.');
+      setSttError(tt('mic.unsupported'));
       return;
     }
 
     setSttError(null);
     baseTextRef.current = content;
     const recognition = new Ctor();
-    recognition.lang = lang || 'id-ID';
+    recognition.lang = lang || 'en-US';
     recognition.interimResults = true;
     recognition.continuous = true;
 
@@ -167,13 +169,13 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
     recognition.onerror = (event: any) => {
       const code = event?.error || 'unknown';
       if (code === 'not-allowed' || code === 'service-not-allowed') {
-        setSttError('Izin mic ditolak. Klik ikon gembok di address bar lalu izinkan microphone.');
+        setSttError(tt('mic.denied'));
       } else if (code === 'no-speech') {
-        setSttError('Tidak terdengar suara. Coba ngomong lebih dekat ke mic.');
+        setSttError(tt('mic.noSpeech'));
       } else if (code === 'audio-capture') {
-        setSttError('Mic tidak ditemukan. Pastikan microphone terpasang.');
+        setSttError(tt('mic.noMic'));
       } else if (code !== 'aborted') {
-        setSttError('Voice-to-text gagal. Coba lagi.');
+        setSttError(tt('mic.failed'));
       }
     };
 
@@ -190,7 +192,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
       isListeningRef.current = true;
       setIsListening(true);
     } catch {
-      setSttError('Gagal menyalakan mic. Coba lagi.');
+      setSttError(tt('mic.startFail'));
     }
   };
 
@@ -214,7 +216,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
     setAttachError(null);
     try {
       const imageCount = attachments.filter((a) => a.kind === 'image').length;
-      const { attachments: fresh, error } = await prepareFiles(list, imageCount);
+      const { attachments: fresh, error } = await prepareFiles(list, imageCount, uiLang);
       if (fresh.length > 0) {
         const stamped: PreparedAttachment[] = fresh.map((a, i) => ({
           ...a,
@@ -257,7 +259,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
               )}
               <button
                 onClick={() => removeAttachment(att.id)}
-                title="Hapus lampiran"
+                title={tt('attach.remove')}
                 className="absolute -top-1.5 -right-1.5 bg-[#24242D] hover:bg-[#383842] rounded-full p-0.5 text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3" />
@@ -272,8 +274,9 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
         value={content}
         onChange={handleInput}
         onKeyDown={handleKeyDown}
-        placeholder={isListening ? 'Mendengarkan... ngomong aja, nanti jadi teks' : 'Type a message...'}
+        placeholder={isListening ? tt('chat.listening') : tt('chat.placeholder')}
         disabled={disabled}
+        dir="auto"
         rows={1}
         className="w-full max-h-[200px] bg-transparent resize-none outline-none text-[#F5F5F5] px-2 py-1 placeholder:text-[#8B8B98] custom-scrollbar disabled:opacity-50"
         style={{ minHeight: '44px' }}
@@ -284,7 +287,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
           {isListening && (
             <span className="flex items-center gap-1.5 text-xs text-red-400">
               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-              Merekam... klik mic lagi untuk berhenti
+              {tt('chat.recording')}
             </span>
           )}
           {sttError && !isListening && (
@@ -295,7 +298,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
           )}
           {isPreparing && (
             <span className="flex items-center gap-1.5 text-xs text-[#8B8B98]">
-              <Loader2 className="w-3 h-3 animate-spin" /> Menyiapkan lampiran...
+              <Loader2 className="w-3 h-3 animate-spin" /> {tt('attach.preparing')}
             </span>
           )}
         </div>
@@ -308,14 +311,14 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
               onClick={() => setIsAttachOpen((v) => !v)}
               className="p-2 text-[#8B8B98] hover:text-[#F5F5F5] hover:bg-[#16161D] rounded-lg transition-colors"
               disabled={disabled}
-              title="Lampirkan (foto, kamera, dokumen)"
+              title={tt('attach.openTitle')}
             >
               <Plus className="w-5 h-5" />
             </button>
             {isAttachOpen && (
               <div className="absolute bottom-full left-0 mb-2 w-60 bg-[#16161D] border border-[#24242D] rounded-xl shadow-xl py-1.5 z-50">
                 <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-[#8B8B98]">
-                  Lampirkan
+                  {tt('attach.title')}
                 </div>
                 <button
                   onClick={() => galleryInputRef.current?.click()}
@@ -323,8 +326,8 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
                 >
                   <ImageIcon className="w-4 h-4 shrink-0 text-[#8B8B98]" />
                   <span>
-                    <span className="block font-medium">Foto & Galeri</span>
-                    <span className="block text-xs text-[#8B8B98]">Pilih foto yang sudah ada</span>
+                    <span className="block font-medium">{tt('attach.photo')}</span>
+                    <span className="block text-xs text-[#8B8B98]">{tt('attach.photoDesc')}</span>
                   </span>
                 </button>
                 <button
@@ -333,8 +336,8 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
                 >
                   <Camera className="w-4 h-4 shrink-0 text-[#8B8B98]" />
                   <span>
-                    <span className="block font-medium">Kamera</span>
-                    <span className="block text-xs text-[#8B8B98]">Ambil foto langsung</span>
+                    <span className="block font-medium">{tt('attach.camera')}</span>
+                    <span className="block text-xs text-[#8B8B98]">{tt('attach.cameraDesc')}</span>
                   </span>
                 </button>
                 <button
@@ -343,8 +346,8 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
                 >
                   <FileText className="w-4 h-4 shrink-0 text-[#8B8B98]" />
                   <span>
-                    <span className="block font-medium">Dokumen teks</span>
-                    <span className="block text-xs text-[#8B8B98]">.txt .md .csv .json kode</span>
+                    <span className="block font-medium">{tt('attach.doc')}</span>
+                    <span className="block text-xs text-[#8B8B98]">{tt('attach.docDesc')}</span>
                   </span>
                 </button>
               </div>
@@ -353,7 +356,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
           <button
             onClick={toggleListening}
             disabled={disabled || (!sttSupported && !isListening)}
-            title={sttSupported ? 'Ngomong jadi teks (Bahasa Indonesia)' : 'Voice-to-text tidak didukung browser ini'}
+            title={sttSupported ? tt('mic.titleOn') : tt('mic.titleOff')}
             className={`p-2 rounded-lg transition-colors disabled:opacity-40 ${
               isListening
                 ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20 animate-pulse'

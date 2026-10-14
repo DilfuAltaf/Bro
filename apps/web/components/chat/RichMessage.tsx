@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import katex from 'katex';
 import { Check, Copy } from 'lucide-react';
+import { FALLBACK_DOC_TITLES, normalizeLang, t, type AppLang } from '@/lib/i18n';
 
 // ── Safe Markdown subset renderer ─────────────────────────────
 // Parses headings, GFM tables, fenced code, lists, quotes, LaTeX math,
@@ -45,8 +46,9 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
+export function CopyButton({ text, label, lang }: { text: string; label?: string; lang?: string }) {
   const [state, setState] = useState<'idle' | 'ok' | 'fail'>('idle');
+  const L = normalizeLang(lang);
 
   const onClick = async () => {
     const ok = await copyText(text);
@@ -57,11 +59,11 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
   return (
     <button
       onClick={onClick}
-      title={state === 'fail' ? 'Gagal menyalin' : label}
+      title={state === 'fail' ? t(L, 'copy.failTitle') : (label ?? t(L, 'copy.label'))}
       className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[#8B8B98] hover:text-[#F5F5F5] hover:bg-[#24242D] transition-colors"
     >
       {state === 'ok' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-      {state === 'ok' ? 'Tersalin' : state === 'fail' ? 'Gagal' : label}
+      {state === 'ok' ? t(L, 'copy.done') : state === 'fail' ? t(L, 'copy.fail') : (label ?? t(L, 'copy.label'))}
     </button>
   );
 }
@@ -356,12 +358,12 @@ function tableToTsv(header: string[], rows: string[][]): string {
   return lines.join('\n');
 }
 
-function CodeBlock({ lang, code }: { lang: string; code: string }) {
+function CodeBlock({ codeLang, code, uiLang }: { codeLang: string; code: string; uiLang: AppLang }) {
   return (
     <div className="rounded-lg overflow-hidden border border-[#24242D] bg-[#0d0d12]">
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#111116] border-b border-[#24242D]">
-        <span className="text-xs text-[#8B8B98] font-mono">{lang || 'code'}</span>
-        <CopyButton text={code} />
+        <span className="text-xs text-[#8B8B98] font-mono">{codeLang || t(uiLang, 'code.name')}</span>
+        <CopyButton text={code} lang={uiLang} />
       </div>
       <pre className="p-3 overflow-x-auto text-[13px] leading-relaxed font-mono text-[#e5e5ea] whitespace-pre">
         {code || ' '}
@@ -376,14 +378,14 @@ const ALIGN_CLASS: Record<Align, string> = {
   right: 'text-right',
 };
 
-function TableBlock({ header, align, rows }: { header: string[]; align: Align[]; rows: string[][] }) {
+function TableBlock({ header, align, rows, uiLang }: { header: string[]; align: Align[]; rows: string[][]; uiLang: AppLang }) {
   return (
     <div className="rounded-lg overflow-hidden border border-[#24242D]">
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#111116] border-b border-[#24242D]">
         <span className="text-xs text-[#8B8B98]">
-          Tabel • {header.length} kolom • {rows.length} baris
+          {t(uiLang, 'table.name')} • {header.length} {t(uiLang, 'table.cols')} • {rows.length} {t(uiLang, 'table.rows')}
         </span>
-        <CopyButton text={tableToTsv(header, rows)} label="Copy TSV" />
+        <CopyButton text={tableToTsv(header, rows)} label={t(uiLang, 'table.copyTsv')} lang={uiLang} />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse min-w-[320px]">
@@ -403,7 +405,7 @@ function TableBlock({ header, align, rows }: { header: string[]; align: Align[];
             {rows.length === 0 && (
               <tr>
                 <td colSpan={header.length} className="px-3 py-3 text-center text-[#8B8B98] text-[13px]">
-                  (tabel kosong)
+                  {t(uiLang, 'table.empty')}
                 </td>
               </tr>
             )}
@@ -426,8 +428,9 @@ function TableBlock({ header, align, rows }: { header: string[]; align: Align[];
   );
 }
 
-export function RichMessage({ content }: { content: string }) {
+export function RichMessage({ content, lang }: { content: string; lang?: string }) {
   if (!content) return null;
+  const uiLang = normalizeLang(lang);
   const blocks = parseMarkdown(content);
 
   return (
@@ -449,9 +452,9 @@ export function RichMessage({ content }: { content: string }) {
               </h4>
             );
           case 'code':
-            return <CodeBlock key={idx} lang={b.lang} code={b.code} />;
+            return <CodeBlock key={idx} codeLang={b.lang} code={b.code} uiLang={uiLang} />;
           case 'table':
-            return <TableBlock key={idx} header={b.header} align={b.align} rows={b.rows} />;
+            return <TableBlock key={idx} header={b.header} align={b.align} rows={b.rows} uiLang={uiLang} />;
           case 'list':
             return b.ordered ? (
               <ol key={idx} className="list-decimal pl-5 space-y-1 text-[#e5e5ea]">
@@ -504,13 +507,14 @@ export function isDocumentLike(content: string): boolean {
   return rich >= 2;
 }
 
-export function docTitle(content: string): string {
+export function docTitle(content: string, lang?: string): string {
   const blocks = parseMarkdown(content);
   for (const b of blocks) {
     if (b.kind === 'heading' && b.text) return b.text.slice(0, 60);
   }
   const first = (content || '').split('\n').map((l) => l.trim()).find((l) => l.length > 0) || '';
-  return first.length > 60 ? first.slice(0, 60) + '…' : first || 'Jawaban AI';
+  const fallback = t(normalizeLang(lang), 'doc.fallbackTitle');
+  return first.length > 60 ? first.slice(0, 60) + '…' : first || fallback;
 }
 
 export function hasTable(content: string): boolean {
@@ -521,30 +525,126 @@ export function hasCode(content: string): boolean {
   return parseMarkdown(content).some((b) => b.kind === 'code');
 }
 
-export function getFollowUps(content: string, title: string): FollowUp[] {
-  const ref = title && title !== 'Jawaban AI' ? ` tentang "${title}"` : '';
+export function getFollowUps(content: string, title: string, lang: string = 'en'): FollowUp[] {
+  const ref = title && !FALLBACK_DOC_TITLES.has(title) ? ` "${title}"` : '';
+  const L = ((lang || 'en').split(/[-_]/)[0] || 'en').toLowerCase();
   if (hasTable(content)) {
-    return [
-      { id: 'tbl-explain', label: 'Jelaskan tabel', prompt: `Jelaskan tabel pada jawaban terakhirmu${ref} dengan bahasa sederhana.` },
-      { id: 'tbl-addcol', label: 'Tambah kolom', prompt: `Tambahkan satu kolom yang relevan ke tabel pada jawaban terakhirmu${ref}, tampilkan tabel lengkap yang baru.` },
-      { id: 'tbl-sum', label: 'Buat ringkasan', prompt: `Buatkan ringkasan dari tabel pada jawaban terakhirmu${ref}.` },
-    ];
+    switch (L) {
+      case 'ar': return [
+        { id: 'tbl-explain', label: 'اشرح الجدول', prompt: `اشرح الجدول في إجابتك الأخيرة${ref} بلغة بسيطة.` },
+        { id: 'tbl-addcol', label: 'أضف عموداً', prompt: `أضف عموداً مناسباً إلى الجدول في إجابتك الأخيرة${ref} واعرض الجدول الجديد كاملاً.` },
+        { id: 'tbl-sum', label: 'لخّص', prompt: `لخّص الجدول في إجابتك الأخيرة${ref}.` },
+      ];
+      case 'id': return [
+        { id: 'tbl-explain', label: 'Jelaskan tabel', prompt: `Jelaskan tabel pada jawaban terakhirmu${ref} dengan bahasa sederhana.` },
+        { id: 'tbl-addcol', label: 'Tambah kolom', prompt: `Tambahkan satu kolom yang relevan ke tabel pada jawaban terakhirmu${ref}, tampilkan tabel lengkap yang baru.` },
+        { id: 'tbl-sum', label: 'Buat ringkasan', prompt: `Buatkan ringkasan dari tabel pada jawaban terakhirmu${ref}.` },
+      ];
+      case 'ru': return [
+        { id: 'tbl-explain', label: 'Объясни таблицу', prompt: `Объясни таблицу из твоего последнего ответа${ref} простыми словами.` },
+        { id: 'tbl-addcol', label: 'Добавить столбец', prompt: `Добавь уместный столбец в таблицу из последнего ответа${ref} и покажи новую таблицу целиком.` },
+        { id: 'tbl-sum', label: 'Сводка', prompt: `Сделай краткую сводку таблицы из последнего ответа${ref}.` },
+      ];
+      case 'zh': return [
+        { id: 'tbl-explain', label: '解释表格', prompt: `请用通俗的语言解释你上一次回答中的表格${ref}。` },
+        { id: 'tbl-addcol', label: '加一列', prompt: `请给上一次回答中的表格${ref}加一列相关内容，并展示完整新表格。` },
+        { id: 'tbl-sum', label: '总结', prompt: `请总结上一次回答中的表格${ref}。` },
+      ];
+      case 'ja': return [
+        { id: 'tbl-explain', label: '表を解説', prompt: `直前の回答の表${ref}をやさしく解説してください。` },
+        { id: 'tbl-addcol', label: '列を追加', prompt: `直前の回答の表${ref}に関連する列を1つ追加し、新しい表全体を表示してください。` },
+        { id: 'tbl-sum', label: '要約', prompt: `直前の回答の表${ref}を要約してください。` },
+      ];
+      case 'ko': return [
+        { id: 'tbl-explain', label: '표 설명', prompt: `방금 답변의 표${ref}를 쉬운 말로 설명해줘.` },
+        { id: 'tbl-addcol', label: '열 추가', prompt: `방금 답변의 표${ref}에 관련 열을 하나 추가하고 새 표 전체를 보여줘.` },
+        { id: 'tbl-sum', label: '요약', prompt: `방금 답변의 표${ref}를 요약해줘.` },
+      ];
+      default: return [
+        { id: 'tbl-explain', label: 'Explain table', prompt: `Explain the table in your last answer${ref} in simple terms.` },
+        { id: 'tbl-addcol', label: 'Add column', prompt: `Add one relevant column to the table in your last answer${ref} and show the full new table.` },
+        { id: 'tbl-sum', label: 'Summarize', prompt: `Summarize the table in your last answer${ref}.` },
+      ];
+    }
   }
   if (hasCode(content)) {
-    return [
-      { id: 'code-explain', label: 'Jelaskan kode', prompt: `Jelaskan kode pada jawaban terakhirmu${ref} baris per baris dengan bahasa sederhana.` },
-      { id: 'code-comment', label: 'Tambah komentar', prompt: `Tulis ulang kode pada jawaban terakhirmu${ref} dengan komentar penjelasan, dalam blok kode yang sama.` },
-    ];
+    switch (L) {
+      case 'ar': return [
+        { id: 'code-explain', label: 'اشرح الكود', prompt: `اشرح الكود في إجابتك الأخيرة${ref} سطراً بسطر بلغة بسيطة.` },
+        { id: 'code-comment', label: 'أضف تعليقات', prompt: `أعد كتابة الكود في إجابتك الأخيرة${ref} مع تعليقات شرح داخل نفس كتلة الكود.` },
+      ];
+      case 'id': return [
+        { id: 'code-explain', label: 'Jelaskan kode', prompt: `Jelaskan kode pada jawaban terakhirmu${ref} baris per baris dengan bahasa sederhana.` },
+        { id: 'code-comment', label: 'Tambah komentar', prompt: `Tulis ulang kode pada jawaban terakhirmu${ref} dengan komentar penjelasan, dalam blok kode yang sama.` },
+      ];
+      case 'ru': return [
+        { id: 'code-explain', label: 'Объясни код', prompt: `Объясни код из последнего ответа${ref} построчно простыми словами.` },
+        { id: 'code-comment', label: 'Добавить комментарии', prompt: `Перепиши код из последнего ответа${ref} с поясняющими комментариями в том же блоке кода.` },
+      ];
+      case 'zh': return [
+        { id: 'code-explain', label: '解释代码', prompt: `请逐行用通俗语言解释上一次回答中的代码${ref}。` },
+        { id: 'code-comment', label: '加注释', prompt: `请重写上一次回答中的代码${ref}，加上说明注释，保持同一代码块。` },
+      ];
+      case 'ja': return [
+        { id: 'code-explain', label: 'コードを解説', prompt: `直前の回答のコード${ref}を1行ずつやさしく解説してください。` },
+        { id: 'code-comment', label: 'コメント追加', prompt: `直前の回答のコード${ref}を説明コメント付きで同じコードブロックに書き直してください。` },
+      ];
+      case 'ko': return [
+        { id: 'code-explain', label: '코드 설명', prompt: `방금 답변의 코드${ref}를 한 줄씩 쉽게 설명해줘.` },
+        { id: 'code-comment', label: '주석 추가', prompt: `방금 답변의 코드${ref}를 설명 주석과 함께 같은 코드 블록으로 다시 써줘.` },
+      ];
+      default: return [
+        { id: 'code-explain', label: 'Explain code', prompt: `Explain the code in your last answer${ref} line by line in simple terms.` },
+        { id: 'code-comment', label: 'Add comments', prompt: `Rewrite the code in your last answer${ref} with explanatory comments, in the same code block.` },
+      ];
+    }
   }
   if (isDocumentLike(content)) {
-    return [
-      { id: 'doc-sum', label: 'Buat ringkasan', prompt: `Buatkan ringkasan dari jawaban terakhirmu${ref}.` },
-      { id: 'doc-en', label: 'Terjemahkan ke Inggris', prompt: `Terjemahkan jawaban terakhirmu${ref} ke bahasa Inggris.` },
-      { id: 'doc-expand', label: 'Kembangkan', prompt: `Kembangkan pembahasan jawaban terakhirmu${ref} dengan lebih detail.` },
-      { id: 'doc-grammar', label: 'Perbaiki tata bahasa', prompt: `Perbaiki tata bahasa jawaban terakhirmu${ref} tanpa mengubah isinya.` },
-    ];
+    switch (L) {
+      case 'ar': return [
+        { id: 'doc-sum', label: 'لخّص', prompt: `لخّص إجابتك الأخيرة${ref}.` },
+        { id: 'doc-expand', label: 'وسّع', prompt: `وسّع شرح إجابتك الأخيرة${ref} بمزيد من التفاصيل.` },
+        { id: 'doc-grammar', label: 'حسّن الصياغة', prompt: `حسّن صياغة إجابتك الأخيرة${ref} دون تغيير المحتوى.` },
+      ];
+      case 'id': return [
+        { id: 'doc-sum', label: 'Buat ringkasan', prompt: `Buatkan ringkasan dari jawaban terakhirmu${ref}.` },
+        { id: 'doc-expand', label: 'Kembangkan', prompt: `Kembangkan pembahasan jawaban terakhirmu${ref} dengan lebih detail.` },
+        { id: 'doc-grammar', label: 'Perbaiki tata bahasa', prompt: `Perbaiki tata bahasa jawaban terakhirmu${ref} tanpa mengubah isinya.` },
+      ];
+      case 'ru': return [
+        { id: 'doc-sum', label: 'Сводка', prompt: `Сделай краткую сводку последнего ответа${ref}.` },
+        { id: 'doc-expand', label: 'Подробнее', prompt: `Раскрой подробнее последний ответ${ref}.` },
+        { id: 'doc-grammar', label: 'Исправь стиль', prompt: `Исправь стиль последнего ответа${ref}, не меняя смысл.` },
+      ];
+      case 'zh': return [
+        { id: 'doc-sum', label: '总结', prompt: `请总结你上一次的回答${ref}。` },
+        { id: 'doc-expand', label: '展开', prompt: `请更详细地展开上一次的回答${ref}。` },
+        { id: 'doc-grammar', label: '润色', prompt: `请润色上一次回答${ref}的语言，不改变内容。` },
+      ];
+      case 'ja': return [
+        { id: 'doc-sum', label: '要約', prompt: `直前の回答${ref}を要約してください。` },
+        { id: 'doc-expand', label: '詳しく', prompt: `直前の回答${ref}をさらに詳しく展開してください。` },
+        { id: 'doc-grammar', label: '校正', prompt: `直前の回答${ref}の文法を内容を変えずに直してください。` },
+      ];
+      case 'ko': return [
+        { id: 'doc-sum', label: '요약', prompt: `방금 답변${ref}을 요약해줘.` },
+        { id: 'doc-expand', label: '자세히', prompt: `방금 답변${ref}을 더 자세히 풀어줘.` },
+        { id: 'doc-grammar', label: '다듬기', prompt: `방금 답변${ref}의 문장을 내용 그대로 다듬어줘.` },
+      ];
+      default: return [
+        { id: 'doc-sum', label: 'Summarize', prompt: `Summarize your last answer${ref}.` },
+        { id: 'doc-expand', label: 'Expand', prompt: `Expand your last answer${ref} with more detail.` },
+        { id: 'doc-grammar', label: 'Fix grammar', prompt: `Fix the grammar of your last answer${ref} without changing its content.` },
+      ];
+    }
   }
-  return [
-    { id: 'gen-detail', label: 'Jelaskan lebih detail', prompt: `Jelaskan jawaban terakhirmu${ref} dengan lebih detail dan contoh.` },
-  ];
+  switch (L) {
+    case 'ar': return [{ id: 'gen-detail', label: 'اشرح بتفصيل', prompt: `اشرح إجابتك الأخيرة${ref} بمزيد من التفاصيل والأمثلة.` }];
+    case 'id': return [{ id: 'gen-detail', label: 'Jelaskan lebih detail', prompt: `Jelaskan jawaban terakhirmu${ref} dengan lebih detail dan contoh.` }];
+    case 'ru': return [{ id: 'gen-detail', label: 'Подробнее', prompt: `Объясни последний ответ${ref} подробнее, с примерами.` }];
+    case 'zh': return [{ id: 'gen-detail', label: '详细解释', prompt: `请更详细地解释上一次的回答${ref}，并举例。` }];
+    case 'ja': return [{ id: 'gen-detail', label: '詳しく', prompt: `直前の回答${ref}を例を交えて詳しく説明してください。` }];
+    case 'ko': return [{ id: 'gen-detail', label: '자세히', prompt: `방금 답변${ref}을 예시와 함께 더 자세히 설명해줘.` }];
+    default: return [{ id: 'gen-detail', label: 'More detail', prompt: `Explain your last answer${ref} in more detail with examples.` }];
+  }
 }

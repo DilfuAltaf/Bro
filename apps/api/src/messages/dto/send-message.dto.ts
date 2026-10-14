@@ -14,6 +14,10 @@ export class SendMessageDto {
   model?: string;
 
   @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsOptional()
   @IsArray()
   @ArrayMaxSize(4)
   @IsString({ each: true })

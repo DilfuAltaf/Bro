@@ -2,13 +2,18 @@
 
 import { useEffect, useRef } from 'react';
 import MessageBubble from './MessageBubble';
-import { Loader2, GraduationCap, Microscope, Lightbulb, FileText } from 'lucide-react';
+import { GraduationCap, Microscope, Lightbulb, FileText } from 'lucide-react';
+import { useAppLanguage } from '@/lib/i18n';
+import type { AiStatus, ChatSource } from '@/app/(dashboard)/chat/page';
 
 type Message = {
   id: string;
   role: 'user' | 'ai';
   content: string;
   timestamp: string;
+  model?: string;
+  status?: AiStatus | null;
+  sources?: ChatSource[];
 };
 
 type Props = {
@@ -21,6 +26,7 @@ type Props = {
 
 export default function ChatWindow({ messages, isLoading, onModeSelect, onSendMessage, onRegenerateMessage }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { tt } = useAppLanguage();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -31,66 +37,73 @@ export default function ChatWindow({ messages, isLoading, onModeSelect, onSendMe
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         <div className="mb-6 flex flex-col items-center justify-center">
             <img src="/logo.png" alt="AI" className="w-16 h-16 object-contain mb-4" />
-            <h2 className="text-3xl font-semibold text-[#F5F5F5] mb-2">What can I help with?</h2>
-            <p className="text-sm text-[#8B8B98] mb-8">Your personal AI assistant for thinking, learning, and creating.</p>
+            <h2 className="text-3xl font-semibold text-[#F5F5F5] mb-2">{tt('chat.emptyTitle')}</h2>
+            <p className="text-sm text-[#8B8B98] mb-8">{tt('chat.emptySub')}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full">
           <button onClick={() => onModeSelect?.('learning')} className="flex flex-col items-start p-4 bg-[#111116] border border-[#24242D] rounded-xl hover:bg-[#16161D] transition-colors group">
             <GraduationCap className="w-5 h-5 text-[#8B8B98] group-hover:text-[#F5F5F5] mb-2" />
-            <span className="text-sm font-medium text-[#F5F5F5]">Learning</span>
-            <span className="text-xs text-[#8B8B98] mt-1 text-left">Explain concepts clearly and test my knowledge</span>
+            <span className="text-sm font-medium text-[#F5F5F5]">{tt('mode.learning')}</span>
+            <span className="text-xs text-[#8B8B98] mt-1 text-left">{tt('skill.learning.desc')}</span>
           </button>
           
           <button onClick={() => onModeSelect?.('research')} className="flex flex-col items-start p-4 bg-[#111116] border border-[#24242D] rounded-xl hover:bg-[#16161D] transition-colors group">
             <Microscope className="w-5 h-5 text-[#8B8B98] group-hover:text-[#F5F5F5] mb-2" />
-            <span className="text-sm font-medium text-[#F5F5F5]">Research</span>
-            <span className="text-xs text-[#8B8B98] mt-1 text-left">Deep dive into topics and gather information</span>
+            <span className="text-sm font-medium text-[#F5F5F5]">{tt('mode.research')}</span>
+            <span className="text-xs text-[#8B8B98] mt-1 text-left">{tt('skill.research.desc')}</span>
           </button>
 
           <button onClick={() => onModeSelect?.('brainstorm')} className="flex flex-col items-start p-4 bg-[#111116] border border-[#24242D] rounded-xl hover:bg-[#16161D] transition-colors group">
             <Lightbulb className="w-5 h-5 text-[#8B8B98] group-hover:text-[#F5F5F5] mb-2" />
-            <span className="text-sm font-medium text-[#F5F5F5]">Brainstorm</span>
-            <span className="text-xs text-[#8B8B98] mt-1 text-left">Generate ideas and creative solutions</span>
+            <span className="text-sm font-medium text-[#F5F5F5]">{tt('mode.brainstorm')}</span>
+            <span className="text-xs text-[#8B8B98] mt-1 text-left">{tt('skill.brainstorm.desc')}</span>
           </button>
 
           <button onClick={() => onModeSelect?.('assignment')} className="flex flex-col items-start p-4 bg-[#111116] border border-[#24242D] rounded-xl hover:bg-[#16161D] transition-colors group">
             <FileText className="w-5 h-5 text-[#8B8B98] group-hover:text-[#F5F5F5] mb-2" />
-            <span className="text-sm font-medium text-[#F5F5F5]">Assignment</span>
-            <span className="text-xs text-[#8B8B98] mt-1 text-left">Help me complete my tasks and homework</span>
+            <span className="text-sm font-medium text-[#F5F5F5]">{tt('mode.assignment')}</span>
+            <span className="text-xs text-[#8B8B98] mt-1 text-left">{tt('skill.assignment.desc')}</span>
           </button>
         </div>
       </div>
     );
   }
 
+  // Placeholder AI kosong (thinking/streaming) sudah punya status sendiri
+  // di dalam bubble — loader titik terpisah disembunyikan agar logo tunggal.
+  const lastMsg = messages[messages.length - 1];
+  const hasAiPlaceholder = !!lastMsg && lastMsg.role === 'ai' && !lastMsg.content;
+
+  let lastAiId: string | null = null;
+  for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
+    if (messages[idx]!.role === 'ai' && messages[idx]!.content) {
+      lastAiId = messages[idx]!.id;
+      break;
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
       <div className="max-w-3xl mx-auto w-full space-y-6">
-        {(() => {
-          let lastAiId: string | null = null;
-          for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
-            if (messages[idx]!.role === 'ai' && messages[idx]!.content) {
-              lastAiId = messages[idx]!.id;
-              break;
-            }
-          }
-          return messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              onSend={onSendMessage}
-              onRegenerate={onRegenerateMessage}
-              showFollowUps={msg.role === 'ai' && msg.id === lastAiId}
-              sendingDisabled={isLoading}
-            />
-          ));
-        })()}
+        {messages.map((msg) => (
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            onSend={onSendMessage}
+            onRegenerate={onRegenerateMessage}
+            showFollowUps={msg.role === 'ai' && msg.id === lastAiId}
+            sendingDisabled={isLoading}
+          />
+        ))}
         
-        {isLoading && (
+        {/* Indikator loading terpisah hanya bila belum ada placeholder AI:
+            saat placeholder sudah ada, status thinking/aktivitas dirender
+            di dalam bubble-nya (satu logo saja, tanpa logo ganda). */}
+        {isLoading && !hasAiPlaceholder && (
           <div className="flex justify-start">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-full bg-[#111116] border border-[#24242D] flex items-center justify-center shrink-0">
-                 <img src="/logo.png" alt="AI" className="w-5 h-5 object-contain" />
+                  <img src="/logo.png" alt="AI" className="w-5 h-5 object-contain" />
               </div>
               <div className="px-4 py-2 flex items-center gap-2">
                 <div className="flex gap-1">

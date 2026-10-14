@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { GeminiService } from './gemini.service';
 
 @Controller('gemini')
@@ -11,9 +11,9 @@ export class GeminiController {
     return this.geminiService.checkHealth();
   }
 
-  /** Daftar model yang bisa dipilih user (Gemini + Groq). */
+  /** Daftar model yang bisa dipilih user (Gemini + Groq). `?lang=` melokalkan deskripsi. */
   @Get('models')
-  async models() {
-    return this.geminiService.listModels();
+  async models(@Query('lang') lang?: string) {
+    return this.geminiService.listModels(lang);
   }
 }

@@ -2,6 +2,7 @@
  * Lampiran chat ala ChatGPT: gambar (galeri/kamera, via vision) + file teks
  * (disisipkan sebagai teks). Semua diproses di client sebelum dikirim.
  */
+import { tx, type AppLang } from './i18n';
 
 export type OutgoingAttachment =
   | { kind: 'image'; name: string; dataUrl: string }
@@ -59,7 +60,7 @@ export async function compressImage(file: File): Promise<string> {
 
 export type PreparedBatch = {
   attachments: OutgoingAttachment[];
-  /** Pesan error pertama (Indonesia) kalau ada file yang ditolak. */
+  /** Pesan error pertama (sesuai bahasa UI) kalau ada file yang ditolak. */
   error?: string;
 };
 
@@ -70,6 +71,7 @@ export type PreparedBatch = {
 export async function prepareFiles(
   files: FileList | File[],
   alreadyImages: number,
+  lang: AppLang = 'en',
 ): Promise<PreparedBatch> {
   const list = Array.from(files);
   const attachments: OutgoingAttachment[] = [];
@@ -79,11 +81,11 @@ export async function prepareFiles(
   for (const file of list) {
     if (file.type.startsWith('image/')) {
       if (imageCount >= MAX_IMAGES_PER_MESSAGE) {
-        error = error || `Maksimal ${MAX_IMAGES_PER_MESSAGE} gambar per pesan.`;
+        error = error || tx(lang, 'attachErr.tooManyImages', { n: MAX_IMAGES_PER_MESSAGE });
         continue;
       }
       if (file.size > MAX_IMAGE_BYTES) {
-        error = error || `"${file.name}" kebesaran (max 10MB).`;
+        error = error || tx(lang, 'attachErr.imageTooBig', { name: file.name });
         continue;
       }
       try {
@@ -93,32 +95,32 @@ export async function prepareFiles(
       } catch {
         error =
           error ||
-          `"${file.name}" tidak bisa dibaca (mis. format HEIC iPhone). Coba JPG/PNG atau screenshot ulang.`;
+          tx(lang, 'attachErr.unreadable', { name: file.name });
       }
     } else if (isTextFile(file)) {
       if (file.size > MAX_TEXT_BYTES) {
-        error = error || `"${file.name}" kebesaran untuk file teks (max 512KB).`;
+        error = error || tx(lang, 'attachErr.textTooBig', { name: file.name });
         continue;
       }
       try {
         const text = await file.text();
         if (!text.trim()) {
-          error = error || `"${file.name}" kosong.`;
+          error = error || tx(lang, 'attachErr.emptyFile', { name: file.name });
           continue;
         }
         attachments.push({ kind: 'text', name: file.name || 'dokumen', text });
       } catch {
-        error = error || `Gagal membaca "${file.name}".`;
+        error = error || tx(lang, 'attachErr.readFail', { name: file.name });
       }
     } else if (file.type.startsWith('video/')) {
-      error = error || 'Video belum didukung. Kirim sebagai gambar atau teks saja.';
+      error = error || tx(lang, 'attachErr.videoNo');
     } else {
       const ext = extOf(file.name);
       error =
         error ||
         (ext === 'pdf' || ext.startsWith('doc') || ext.startsWith('ppt') || ext.startsWith('xls')
-          ? `"${file.name}" (${ext.toUpperCase()}) belum didukung. Screenshot jadi gambar atau convert ke .txt dulu.`
-          : `Format "${file.name}" belum didukung. Bisa kirim gambar (JPG/PNG) atau file teks.`);
+          ? tx(lang, 'attachErr.officeNo', { name: file.name, ext: ext.toUpperCase() })
+          : tx(lang, 'attachErr.formatNo', { name: file.name }));
     }
   }
 

@@ -5,10 +5,12 @@ import { MessageSquarePlus, Clock, Settings, LogOut, UserCircle, Pencil, Trash2,
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SettingsModal from './SettingsModal';
+import { useAppLanguage } from '@/lib/i18n';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function Sidebar() {
+  const { tt } = useAppLanguage();
   const [user, setUser] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -127,13 +129,13 @@ export default function Sidebar() {
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#F5F5F5] hover:bg-[#16161D] transition-colors"
         >
           <MessageSquarePlus className="w-4 h-4 text-[#8B8B98]" />
-          <span className="text-sm font-medium">New Chat</span>
+          <span className="text-sm font-medium">{tt('chat.newChat')}</span>
         </Link>
         
         {user ? (
           <div className="mt-4 flex flex-col gap-1">
             <h3 className="text-xs font-medium text-[#8B8B98] px-3 py-2 flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5" /> Recent
+              <Clock className="w-3.5 h-3.5" /> {tt('chat.recent')}
             </h3>
             {history.map(conv => (
               <div key={conv.id} className="group relative flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#111116] transition-colors">
@@ -184,10 +186,10 @@ export default function Sidebar() {
           </div>
         ) : (
           <div className="mt-6 px-3 text-center">
-            <p className="text-xs text-[#8B8B98] mb-3">Login to save your conversations</p>
+            <p className="text-xs text-[#8B8B98] mb-3">{tt('chat.loginToSave')}</p>
             <div className="flex flex-col gap-2">
-              <Link href="/login" className="text-sm bg-[#16161D] hover:bg-[#24242D] text-[#F5F5F5] py-2 rounded-lg transition-colors">Login</Link>
-              <Link href="/register" className="text-sm text-[#8B8B98] hover:text-[#F5F5F5] py-1">Register</Link>
+              <Link href="/login" className="text-sm bg-[#16161D] hover:bg-[#24242D] text-[#F5F5F5] py-2 rounded-lg transition-colors">{tt('auth.login')}</Link>
+              <Link href="/register" className="text-sm text-[#8B8B98] hover:text-[#F5F5F5] py-1">{tt('auth.register')}</Link>
             </div>
           </div>
         )}
@@ -199,7 +201,7 @@ export default function Sidebar() {
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#8B8B98] hover:text-[#F5F5F5] hover:bg-[#111116] transition-colors"
         >
           <Settings className="w-4 h-4" />
-          <span className="text-sm font-medium">Settings</span>
+          <span className="text-sm font-medium">{tt('chat.settings')}</span>
         </button>
         {user ? (
           <div className="flex items-center justify-between px-3 py-2.5 text-[#8B8B98] hover:bg-[#111116] rounded-lg group">
@@ -214,7 +216,7 @@ export default function Sidebar() {
         ) : (
           <div className="flex items-center gap-3 px-3 py-2.5 text-[#8B8B98]">
             <UserCircle className="w-4 h-4" />
-            <span className="text-sm font-medium">Guest User</span>
+            <span className="text-sm font-medium">{tt('chat.guest')}</span>
           </div>
         )}
       </div>

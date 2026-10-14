@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS "User" (
     "email" VARCHAR(255) UNIQUE NOT NULL,
     "passwordHash" VARCHAR(255),
     "image" TEXT,
+    "language" TEXT NOT NULL DEFAULT 'en' CHECK ("language" IN ('en', 'ar', 'id', 'ru', 'zh', 'ja', 'ko')),
+    "purpose" TEXT CHECK ("purpose" IS NULL OR "purpose" IN ('work', 'study', 'personal', 'developer', 'creator', 'research')),
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

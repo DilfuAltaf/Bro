@@ -55,13 +55,15 @@ export class MessagesController {
   @Post()
   async sendMessage(@Param('id') conversationId: string, @Body() dto: SendMessageDto, @Req() req: any) {
     await this.checkOwnership(conversationId, req.user?.id);
-    return this.messagesService.sendMessage(conversationId, dto.content, dto.mode, dto.model, dto.images);
+    return this.messagesService.sendMessage(conversationId, dto.content, dto.mode, dto.model, dto.images, dto.language);
   }
 
   /**
-   * Server-Sent Events stream. Emits `{"type":"token","value":"..."}` per delta,
-   * then a final `{"type":"done",...}`. The web client consumes this with fetch +
-   * ReadableStream (EventSource cannot POST).
+   * Server-Sent Events stream. Emits:
+   * - `{"type":"status","phase":"thinking"|"searching"|"reading"|"generating"}` (real lifecycle only)
+   * - `{"type":"token","value":"..."}` per delta,
+   * - then a final `{"type":"done",...,"sources":[{title,url}]}` (sources only from real web research).
+   * The web client consumes this with fetch + ReadableStream (EventSource cannot POST).
    */
   @Post('stream')
   async streamMessage(
@@ -89,11 +91,12 @@ export class MessagesController {
         dto.mode,
         dto.model,
         dto.images,
+        dto.language,
       )) {
         send(event);
       }
     } catch (error: any) {
-      send({ type: 'error', message: error?.message || 'Terjadi kesalahan.' });
+      send({ type: 'error', message: error?.message || 'An error occurred.' });
     } finally {
       res.end();
     }

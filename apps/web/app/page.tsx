@@ -1,19 +1,58 @@
+'use client';
+
 import Link from 'next/link';
-import { MessageSquare, HeartHandshake, Search, Lightbulb, GraduationCap, FileText, Briefcase } from 'lucide-react';
+import { MessageSquare, HeartHandshake, Search, Lightbulb, GraduationCap, FileText, Briefcase, Globe } from 'lucide-react';
+import { useState } from 'react';
+import { SUPPORTED_LANGUAGES, setLangPicked, useAppLanguage } from '@/lib/i18n';
 
 export default function LandingPage() {
+  const { lang, setLang, tt } = useAppLanguage();
+  const [langOpen, setLangOpen] = useState(false);
+
   const skills = [
-    { title: "Support", mode: "support", icon: <HeartHandshake className="w-6 h-6" />, desc: "Talk things through and get guidance" },
-    { title: "Research", mode: "research", icon: <Search className="w-6 h-6" />, desc: "Explore topics and find useful information" },
-    { title: "Brainstorm", mode: "brainstorm", icon: <Lightbulb className="w-6 h-6" />, desc: "Generate ideas and explore possibilities" },
-    { title: "Learning", mode: "learning", icon: <GraduationCap className="w-6 h-6" />, desc: "Understand new concepts step by step" },
-    { title: "Assignment", mode: "assignment", icon: <Briefcase className="w-6 h-6" />, desc: "Break down tasks and work through them" },
-    { title: "Document", mode: "document", icon: <FileText className="w-6 h-6" />, desc: "Review and understand documents" }
+    { title: tt('mode.support'), mode: "support", icon: <HeartHandshake className="w-6 h-6" />, desc: tt('skill.support.desc') },
+    { title: tt('mode.research'), mode: "research", icon: <Search className="w-6 h-6" />, desc: tt('skill.research.desc') },
+    { title: tt('mode.brainstorm'), mode: "brainstorm", icon: <Lightbulb className="w-6 h-6" />, desc: tt('skill.brainstorm.desc') },
+    { title: tt('mode.learning'), mode: "learning", icon: <GraduationCap className="w-6 h-6" />, desc: tt('skill.learning.desc') },
+    { title: tt('mode.assignment'), mode: "assignment", icon: <Briefcase className="w-6 h-6" />, desc: tt('skill.assignment.desc') },
+    { title: tt('mode.document'), mode: "document", icon: <FileText className="w-6 h-6" />, desc: tt('skill.document.desc') }
   ];
+
+  const active = SUPPORTED_LANGUAGES.find((l) => l.code === lang);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-slate-100 selection:bg-indigo-500/30">
-      <main className="max-w-6xl mx-auto px-6 py-24 flex flex-col items-center justify-center min-h-[80vh] text-center">
+      {/* Language switcher */}
+      <header className="max-w-6xl mx-auto px-6 pt-6 flex justify-end">
+        <div className="relative">
+          <button
+            onClick={() => setLangOpen((v) => !v)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1a1a24] border border-[#2e2e3d] hover:border-indigo-500/50 text-sm transition-colors"
+          >
+            <Globe className="w-4 h-4" />
+            <span>{active?.flag} {active?.label}</span>
+          </button>
+          {langOpen && (
+            <div className="absolute right-0 mt-2 w-56 bg-[#12121a] border border-[#2e2e3d] rounded-xl shadow-xl py-1 z-50 max-h-80 overflow-y-auto">
+              {SUPPORTED_LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => { setLang(l.code); setLangPicked(); setLangOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#1a1a24] transition-colors text-left ${l.code === lang ? 'text-white bg-[#1a1a24]' : 'text-slate-300'}`}
+                >
+                  <span className="text-xl">{l.flag}</span>
+                  <span className="flex-1">
+                    <span className="block font-medium">{l.label}</span>
+                    <span className="block text-xs text-slate-500">{l.native}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-6 py-16 flex flex-col items-center justify-center min-h-[80vh] text-center">
         
         {/* Hero Section */}
         <div className="relative mb-12 flex items-center justify-center gap-6">
@@ -26,15 +65,15 @@ export default function LandingPage() {
         </div>
         
         <p className="text-2xl md:text-4xl font-semibold mb-6 text-slate-200 max-w-3xl">
-          Your Personal AI Assistant
+          {tt('app.tagline')}
         </p>
         
         <p className="text-lg md:text-xl text-slate-300 mb-4 max-w-2xl">
-          Think, learn, research, create, and get things done with one AI assistant.
+          {tt('app.description')}
         </p>
         
         <p className="text-md md:text-lg text-slate-400 mb-12 max-w-3xl">
-          One assistant. Multiple capabilities. One continuous conversation.
+          {tt('app.subtag')}
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
@@ -43,19 +82,19 @@ export default function LandingPage() {
             className="group relative inline-flex items-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-semibold text-lg transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(99,102,241,0.5)]"
           >
             <MessageSquare className="w-5 h-5 group-hover:animate-pulse" />
-            <span>Start Chatting</span>
+            <span>{tt('app.start')}</span>
           </Link>
           <a
             href="#capabilities"
             className="inline-flex items-center gap-2 px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-full font-semibold text-lg transition-all duration-300 hover:scale-105"
           >
-            Explore Capabilities
+            {tt('app.explore')}
           </a>
         </div>
 
         {/* Skills Grid */}
         <div id="capabilities" className="mt-32 w-full">
-          <h2 className="text-2xl font-bold mb-10 text-slate-300">Capabilities</h2>
+          <h2 className="text-2xl font-bold mb-10 text-slate-300">{tt('app.capabilities')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {skills.map((skill, idx) => (
               <Link 

@@ -7,8 +7,13 @@ import ChatInput from '@/components/chat/ChatInput';
 import { MAX_DOCS_PER_MESSAGE, MAX_IMAGES_PER_MESSAGE, OutgoingAttachment } from '@/lib/attachments';
 import { ChevronDown, GraduationCap, Microscope, Lightbulb, FileText, LifeBuoy, Zap, Cpu, Check, OctagonAlert, ArrowRightLeft } from 'lucide-react';
 import { PREF_KEYS } from '@/components/shared/SettingsModal';
+import { getStoredLang, getStoredPurpose, normalizePurpose, purposeDefaultMode, setStoredPurpose, sttForLang, syncLangFromServer, tx, useAppLanguage } from '@/lib/i18n';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+export type AiStatus = 'thinking' | 'searching' | 'reading' | 'generating';
+
+export type ChatSource = { title: string; url: string };
 
 type Message = {
   id: string;
@@ -17,15 +22,19 @@ type Message = {
   timestamp: string;
   /** ID model yang benar-benar menjawab (untuk label "via ..."). */
   model?: string;
+  /** Status aktivitas real-time (hanya selama respons berjalan). */
+  status?: AiStatus | null;
+  /** Sumber web riil dari event `done` (hanya research mode). */
+  sources?: ChatSource[];
 };
 
 const AVAILABLE_MODES = [
-  { value: 'general', label: 'General', icon: Zap },
-  { value: 'learning', label: 'Learning', icon: GraduationCap },
-  { value: 'research', label: 'Research', icon: Microscope },
-  { value: 'brainstorm', label: 'Brainstorm', icon: Lightbulb },
-  { value: 'support', label: 'Support', icon: LifeBuoy },
-  { value: 'assignment', label: 'Assignment', icon: FileText },
+  { value: 'general', labelKey: 'mode.general', icon: Zap },
+  { value: 'learning', labelKey: 'mode.learning', icon: GraduationCap },
+  { value: 'research', labelKey: 'mode.research', icon: Microscope },
+  { value: 'brainstorm', labelKey: 'mode.brainstorm', icon: Lightbulb },
+  { value: 'support', labelKey: 'mode.support', icon: LifeBuoy },
+  { value: 'assignment', labelKey: 'mode.assignment', icon: FileText },
 ];
 
 type LlmModelOption = {
@@ -37,11 +46,11 @@ type LlmModelOption = {
 };
 
 const FALLBACK_LLM_MODELS: LlmModelOption[] = [
-  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', provider: 'gemini', description: 'Cepat & hemat kuota' },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'gemini', description: 'Lebih pintar untuk reasoning' },
-  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B (Groq)', provider: 'groq', description: 'Serbaguna & multibahasa' },
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', provider: 'gemini', description: 'Fast & quota-friendly' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'gemini', description: 'Smarter for reasoning' },
+  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B (Groq)', provider: 'groq', description: 'Versatile & multilingual' },
   { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B (Groq)', provider: 'groq', description: 'Flagship open-weight' },
-  { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B (Groq)', provider: 'groq', description: 'Ringan & cepat' },
+  { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B (Groq)', provider: 'groq', description: 'Light & fast' },
 ];
 
 /** Nama pendek model untuk label (buang prefix provider seperti "openai/"). */
@@ -52,13 +61,14 @@ function shortModelName(id: string): string {
 
 /** True kalau pesan error menandakan kuota/rate-limit habis. */
 function isLimitError(text: string): boolean {
-  return /limit|kuota|429|habis|semua model/i.test(text);
+  return /limit|quota|kuota|429|habis|exhausted|exceeded|semua model|all.*model/i.test(text);
 }
 
 function ChatPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const { tt } = useAppLanguage();
   
   const initialConvId = searchParams.get('conversationId');
   const initialMode = searchParams.get('mode');
@@ -66,7 +76,8 @@ function ChatPageContent() {
   const [conversationId, setConversationId] = useState<string | null>(initialConvId);
   const [mode, setMode] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
-      return initialMode || localStorage.getItem(PREF_KEYS.mode);
+      // Prioritas: ?mode= → pilihan tersimpan → mapping purpose → general.
+      return initialMode || localStorage.getItem(PREF_KEYS.mode) || purposeDefaultMode(getStoredPurpose());
     }
     return initialMode;
   });
@@ -87,9 +98,9 @@ function ChatPageContent() {
   const [limitBadge, setLimitBadge] = useState<{ kind: 'limit' | 'fallback'; text: string } | null>(null);
   const [sttLang, setSttLang] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(PREF_KEYS.sttLang) || 'id-ID';
+      return localStorage.getItem(PREF_KEYS.sttLang) || sttForLang(getStoredLang());
     }
-    return 'id-ID';
+    return 'en-US';
   });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -116,9 +127,10 @@ function ChatPageContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Ambil katalog model dari backend (status available mengikuti API key server).
+  // Ambil katalog model dari backend (status available mengikuti API key server,
+  // deskripsi mengikuti bahasa UI).
   useEffect(() => {
-    fetch(`${API_URL}/gemini/models`, { credentials: 'include' })
+    fetch(`${API_URL}/gemini/models?lang=${getStoredLang()}`, { credentials: 'include' })
       .then(res => (res.ok ? res.json() : null))
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -134,6 +146,20 @@ function ChatPageContent() {
       .catch(() => { /* pakai fallback statis */ });
   }, []);
 
+  // Sinkronkan bahasa + purpose server -> lokal saat chat dibuka.
+  // Bahasa lokal yang sudah di-pick tidak ditimpa (anti "balik ke default").
+  useEffect(() => {
+    fetch(`${API_URL}/auth/me`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user?.language) syncLangFromServer(data.user.language);
+        const serverPurpose = normalizePurpose(data?.user?.purpose);
+        if (serverPurpose) setStoredPurpose(serverPurpose);
+        setSttLang(sttForLang(getStoredLang()));
+      })
+      .catch(() => { /* guest — pakai bahasa lokal */ });
+  }, []);
+
   // Terapkan preferensi dari Settings modal secara live (tanpa reload).
   useEffect(() => {
     function applyPrefs() {
@@ -144,10 +170,22 @@ function ChatPageContent() {
         if (savedMode) setMode(savedMode);
         const savedLang = localStorage.getItem(PREF_KEYS.sttLang);
         if (savedLang) setSttLang(savedLang);
+        else setSttLang(sttForLang(getStoredLang()));
+        // Deskripsi model ikut bahasa terbaru.
+        fetch(`${API_URL}/gemini/models?lang=${getStoredLang()}`, { credentials: 'include' })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (Array.isArray(data) && data.length > 0) setLlmModels(data);
+          })
+          .catch(() => { /* abaikan */ });
       } catch { /* abaikan */ }
     }
     window.addEventListener('bro-settings-changed', applyPrefs);
-    return () => window.removeEventListener('bro-settings-changed', applyPrefs);
+    window.addEventListener('bro-lang-changed', applyPrefs);
+    return () => {
+      window.removeEventListener('bro-settings-changed', applyPrefs);
+      window.removeEventListener('bro-lang-changed', applyPrefs);
+    };
   }, []);
 
   useEffect(() => {
@@ -169,7 +207,7 @@ function ChatPageContent() {
     fetch(`${API_URL}/conversations/${requestedId}/messages`, { credentials: 'include' })
       .then(res => {
         if (!res.ok) {
-          throw new Error(`Gagal memuat percakapan (HTTP ${res.status}). Coba klik lagi.`);
+          throw new Error(tx(getStoredLang(), 'chat.loadFail', { status: res.status }));
         }
         return res.json();
       })
@@ -191,7 +229,7 @@ function ChatPageContent() {
         console.error('Failed to load messages:', err);
         // Tampilkan ke user — sebelumnya error ini cuma masuk console (tak terlihat).
         if (conversationIdRef.current === requestedId) {
-          setError(err.message || 'Gagal memuat percakapan.');
+          setError(err.message || tt('chat.loadFailGeneric'));
         }
       });
   }, [initialConvId]);
@@ -217,6 +255,7 @@ function ChatPageContent() {
 
   const activeModeObj = AVAILABLE_MODES.find(m => m.value === (mode || 'general')) || AVAILABLE_MODES[0]!;
   const ActiveIcon = activeModeObj.icon;
+  const activeModeLabel = tt(activeModeObj.labelKey);
   const activeModelObj = llmModels.find(m => m.id === selectedModel) || llmModels[0]!;
 
   const DOC_CHARS_PER_FILE = 2500;
@@ -294,7 +333,7 @@ function ChatPageContent() {
       // Dibersihkan di finally.
       streamConvIdRef.current = currentConvId;
       
-      const msgPayload: any = { content: fullContent };
+      const msgPayload: any = { content: fullContent, language: getStoredLang() };
       if (mode) msgPayload.mode = mode;
       if (requestedModel) msgPayload.model = requestedModel;
       if (images.length > 0) msgPayload.images = images.map((i) => i.dataUrl);
@@ -304,7 +343,8 @@ function ChatPageContent() {
         id: aiId,
         role: 'ai',
         content: '',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        status: 'thinking' as AiStatus,
       }]);
 
       const msgRes = await fetch(`${API_URL}/conversations/${currentConvId}/messages/stream`, {
@@ -341,15 +381,23 @@ function ChatPageContent() {
 
           if (event.type === 'token') {
             aiContent += event.value;
-            setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, content: aiContent } : m)));
+            setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, content: aiContent, status: 'generating' as AiStatus } : m)));
+          } else if (event.type === 'status') {
+            const phase = event.phase as AiStatus | undefined;
+            if (phase === 'thinking' || phase === 'searching' || phase === 'reading' || phase === 'generating') {
+              setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, status: phase } : m)));
+            }
           } else if (event.type === 'done') {
             const usedModel = (event.model as string | undefined) || undefined;
-            setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, timestamp: event.createdAt || m.timestamp, model: usedModel } : m)));
+            const doneSources = Array.isArray(event.sources)
+              ? (event.sources as any[]).filter((s) => s && typeof s.url === 'string' && typeof s.title === 'string').map((s) => ({ title: s.title, url: s.url }))
+              : undefined;
+            setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, timestamp: event.createdAt || m.timestamp, model: usedModel, status: null, sources: doneSources } : m)));
             // Model yang menjawab beda dari yang diminta = auto-fallback karena limit.
             if (usedModel && usedModel !== requestedModel) {
               setLimitBadge({
                 kind: 'fallback',
-                text: `Limit — dipindah ke ${shortModelName(usedModel)}`,
+                text: `${tt('chat.limitMoved')} ${shortModelName(usedModel)}`,
               });
             }
             streamDone = true;
@@ -363,11 +411,14 @@ function ChatPageContent() {
       console.error('Chat error:', err);
       if (!aiContent && aiId) {
         setMessages(prev => prev.filter(m => m.id !== aiId));
+      } else if (aiId) {
+        // Respons parsial dipertahankan — pastikan indikator status ikut mati.
+        setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, status: null } : m)));
       }
       const msg = err.message || 'An error occurred while communicating with the server.';
       setError(msg);
       if (isLimitError(msg)) {
-        setLimitBadge({ kind: 'limit', text: 'LIMIT — kuota habis' });
+        setLimitBadge({ kind: 'limit', text: tt('chat.limitOut') });
       }
     } finally {
       streamConvIdRef.current = null;
@@ -398,7 +449,7 @@ function ChatPageContent() {
               className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-[#111116] transition-colors border border-transparent hover:border-[#24242D]"
             >
               <ActiveIcon className="w-4 h-4 text-[#8B8B98]" />
-              <span className="text-sm font-medium text-[#F5F5F5]">{activeModeObj.label}</span>
+              <span className="text-sm font-medium text-[#F5F5F5]">{activeModeLabel}</span>
               <ChevronDown className="w-4 h-4 text-[#8B8B98]" />
             </button>
 
@@ -413,7 +464,7 @@ function ChatPageContent() {
                       className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[#8B8B98] hover:text-[#F5F5F5] hover:bg-[#16161D] transition-colors"
                     >
                       <Icon className="w-4 h-4" />
-                      {m.label}
+                      {tt(m.labelKey)}
                     </button>
                   );
                 })}
@@ -423,7 +474,7 @@ function ChatPageContent() {
 
           <div className="hidden sm:flex items-center gap-1.5 px-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-            <span className="text-xs text-[#8B8B98] font-medium">Online</span>
+            <span className="text-xs text-[#8B8B98] font-medium">{tt('chat.online')}</span>
           </div>
 
           <div className="flex items-center gap-2 relative" ref={modelDropdownRef}>
@@ -444,7 +495,7 @@ function ChatPageContent() {
 
             {isModelOpen && (
               <div className="absolute top-full left-0 mt-1 w-72 bg-[#111116] border border-[#24242D] rounded-lg shadow-xl py-1 z-50">
-                <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-[#8B8B98]">Pilih model AI</div>
+                <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-[#8B8B98]">{tt('chat.selectModel')}</div>
                 {llmModels.map((m) => {
                   const unavailable = m.available === false;
                   const active = m.id === selectedModel;
@@ -470,7 +521,7 @@ function ChatPageContent() {
                         <span className="block text-xs text-[#8B8B98] truncate">{m.description}</span>
                         <span className="block text-[11px] text-[#5b5b68] font-mono truncate">{m.id}</span>
                         {unavailable && (
-                          <span className="block text-[11px] text-amber-400">API key belum diisi di server</span>
+                          <span className="block text-[11px] text-amber-400">{tt('chat.modelUnavailable')}</span>
                         )}
                       </span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase shrink-0 ${
@@ -482,7 +533,7 @@ function ChatPageContent() {
                   );
                 })}
                 <div className="px-3 py-2 text-[11px] text-[#5b5b68] border-t border-[#24242D]">
-                  Groq butuh <span className="font-mono">GROQ_API_KEY</span> di .env server.
+                  {tt('chat.groqNote')}
                 </div>
               </div>
             )}
@@ -493,8 +544,8 @@ function ChatPageContent() {
           {limitBadge && (
             <span
               title={limitBadge.kind === 'limit'
-                ? 'Kuota model habis. Coba lagi nanti, ganti model, atau cek Settings → Kuota & limit.'
-                : 'Model yang kamu pilih kena limit, jadi otomatis dijawab model lain.'}
+                ? tt('chat.limitOutTitle')
+                : tt('chat.limitFallbackTitle')}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide border ${
                 limitBadge.kind === 'limit'
                   ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse'

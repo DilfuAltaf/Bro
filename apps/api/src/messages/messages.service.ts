@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { SafetyService } from '../safety/safety.service';
-import { GeminiService, GeminiMemoryItem, GeminiSource, truncateForLlm } from '../gemini/gemini.service';
+import { GeminiService, GeminiMemoryItem, GeminiSource, GeminiStreamHooks, normalizeLanguage, normalizePurpose, truncateForLlm, type AppPurpose } from '../gemini/gemini.service';
 import * as crypto from 'crypto';
 
 // Diet konteks agar kuota LLM gratis awet: 1 turn "hi" tidak perlu membawa
@@ -21,10 +21,12 @@ const MEMORY_CHARS_PER_ITEM = 300;
 const MAX_IMAGE_ATTACHMENTS = 4;
 const MAX_IMAGE_CHARS = 2_500_000;
 
+export type StreamPhase = 'thinking' | 'searching' | 'reading' | 'generating';
+
 export type MessageStreamEvent =
   | { type: 'token'; value: string }
-  | { type: 'sources'; sources: GeminiSource[] }
-  | { type: 'done'; messageId: string; createdAt: string; intent: string; model?: string }
+  | { type: 'status'; phase: StreamPhase }
+  | { type: 'done'; messageId: string; createdAt: string; intent: string; model?: string; sources?: GeminiSource[] }
   | { type: 'error'; message: string };
 
 const VALID_INTENTS = ['research', 'support', 'learning', 'assignment', 'brainstorm', 'general'];
@@ -132,34 +134,36 @@ export class MessagesService {
     return data || [];
   }
 
-  async sendMessage(conversationId: string, content: string, mode?: string, model?: string, images?: string[]) {
+  async sendMessage(conversationId: string, content: string, mode?: string, model?: string, images?: string[], language?: string) {
     const conversation = await this.requireConversation(conversationId);
 
     const cleanImages = this.sanitizeImages(images);
-    this.logger.log(`[Chat] request received (mode=${mode} model=${model || 'default'} images=${cleanImages.length})`);
+    const prefs = await this.resolveUserPrefs(conversation.userId, language);
+    const resolvedLang = prefs.language;
+    this.logger.log(`[Chat] request received (mode=${mode} model=${model || 'default'} lang=${resolvedLang} purpose=${prefs.purpose || 'none'} images=${cleanImages.length})`);
 
     const history = await this.buildHistory(conversationId, content, cleanImages);
     const memories = await this.loadMemories(conversation.userId);
 
     const userMessage = await this.createMessage(conversationId, 'user', content);
 
-    const safetyCheck = this.safetyService.checkSafety(content);
+    const safetyCheck = this.safetyService.checkSafety(content, resolvedLang);
     if (safetyCheck.isCrisis) {
       this.logger.log('[Chat] safety check triggered short-circuit');
       const assistantMessage = await this.createMessage(
         conversationId,
         'assistant',
-        safetyCheck.response || 'Maaf, saya di sini untuk membantu.',
+        safetyCheck.response || 'Sorry, I am here to help.',
       );
       return { userMessage, assistantMessage, intent: 'support' };
     }
 
-    let aiReply = 'Maaf, saya tidak dapat merespons saat ini.';
+    let aiReply = 'Sorry, I cannot respond right now.';
     let intent = 'general';
     let replyModel: string | undefined;
 
     try {
-      const result = await this.geminiService.chat(history, memories, mode, model);
+      const result = await this.geminiService.chat(history, memories, mode, model, resolvedLang, prefs.purpose);
       aiReply = result.response || aiReply;
       intent = result.intent || intent;
       replyModel = result.model;
@@ -188,21 +192,24 @@ export class MessagesService {
     mode?: string,
     model?: string,
     images?: string[],
+    language?: string,
   ): AsyncGenerator<MessageStreamEvent> {
     const conversation = await this.requireConversation(conversationId);
 
     const cleanImages = this.sanitizeImages(images);
-    this.logger.log(`[Chat] stream request (mode=${mode} model=${model || 'default'} images=${cleanImages.length})`);
+    const prefs = await this.resolveUserPrefs(conversation.userId, language);
+    const resolvedLang = prefs.language;
+    this.logger.log(`[Chat] stream request (mode=${mode} model=${model || 'default'} lang=${resolvedLang} purpose=${prefs.purpose || 'none'} images=${cleanImages.length})`);
 
     const history = await this.buildHistory(conversationId, content, cleanImages);
     const memories = await this.loadMemories(conversation.userId);
 
     await this.createMessage(conversationId, 'user', content);
 
-    const safetyCheck = this.safetyService.checkSafety(content);
+    const safetyCheck = this.safetyService.checkSafety(content, resolvedLang);
     if (safetyCheck.isCrisis) {
       this.logger.log('[Chat] safety check triggered short-circuit');
-      const response = safetyCheck.response || 'Maaf, saya di sini untuk membantu.';
+      const response = safetyCheck.response || 'Sorry, I am here to help.';
       yield { type: 'token', value: response };
       const assistantMessage = await this.createMessage(conversationId, 'assistant', response);
       yield {
@@ -219,16 +226,40 @@ export class MessagesService {
     // Diisi service LLM dengan ID model yang benar-benar menjawab
     // (bisa beda dari yang diminta saat terjadi fallback).
     const actualModel: { modelId?: string } = {};
+    // Hooks fase tool-call riil + sumber web yang dipakai turn ini.
+    // Callback onPhase terpanggil sinkron di dalam iterasi generator
+    // (maybeResearch jalan sebelum token pertama), jadi fasenya
+    // dikumpulkan lalu di-flush berurutan — tanpa timer/estimasi.
+    const pendingPhases: Array<'searching' | 'reading'> = [];
+    const streamHooks: GeminiStreamHooks = {
+      onPhase: (phase) => {
+        pendingPhases.push(phase);
+      },
+    };
+
+    // Request diterima & diproses — status awal yang jujur.
+    yield { type: 'status', phase: 'thinking' };
 
     let full = '';
+    let generated = false;
     try {
-      for await (const delta of this.geminiService.streamChat(history, memories, mode, model, actualModel)) {
+      for await (const delta of this.geminiService.streamChat(history, memories, mode, model, actualModel, resolvedLang, prefs.purpose, streamHooks)) {
+        while (pendingPhases.length > 0) {
+          yield { type: 'status', phase: pendingPhases.shift()! };
+        }
+        if (!generated) {
+          generated = true;
+          yield { type: 'status', phase: 'generating' };
+        }
         full += delta;
         yield { type: 'token', value: delta };
       }
+      while (pendingPhases.length > 0) {
+        yield { type: 'status', phase: pendingPhases.shift()! };
+      }
     } catch (error: any) {
       this.logger.error('Gemini stream error:', error?.message);
-      const message = error?.message || 'Terjadi kesalahan saat menghubungi AI.';
+      const message = error?.message || 'An error occurred while contacting the AI.';
       if (!full) {
         full = message;
         yield { type: 'token', value: message };
@@ -238,10 +269,16 @@ export class MessagesService {
     const assistantMessage = await this.createMessage(
       conversationId,
       'assistant',
-      full || 'Maaf, saya tidak dapat merespons saat ini.',
+      full || 'Sorry, I cannot respond right now.',
     );
 
     await this.recordWorkflowRun(conversationId, intent);
+
+    // Sumber web riil (tanpa isi halaman) — dirender sebagai section Sources.
+    // Riwayat DB tetap menyimpan jawaban teks saja (tanpa perubahan skema).
+    const doneSources = (streamHooks.sources || [])
+      .filter((s) => s && typeof s.url === 'string' && typeof s.title === 'string')
+      .map((s) => ({ title: s.title, url: s.url }));
 
     yield {
       type: 'done',
@@ -249,6 +286,7 @@ export class MessagesService {
       createdAt: new Date(assistantMessage.createdAt).toISOString(),
       intent,
       model: actualModel.modelId,
+      sources: doneSources,
     };
   }
 
@@ -332,5 +370,47 @@ export class MessagesService {
 
   private normalizeIntent(mode?: string): string {
     return mode && VALID_INTENTS.includes(mode) ? mode : 'general';
+  }
+
+  /**
+   * Resolve preferensi jawaban AI dalam 1 query: bahasa (prioritas DTO untuk
+   * guest/override, lalu bahasa tersimpan, fallback 'en') + purpose akun
+   * (null = netral untuk guest/user lama). Tahan terhadap DB belum migrasi.
+   */
+  private async resolveUserPrefs(
+    userId: string,
+    dtoLang?: string,
+  ): Promise<{ language: string; purpose: AppPurpose | null }> {
+    const dtoProvided = typeof dtoLang === 'string' && dtoLang.trim().length > 0;
+    const language = dtoProvided ? normalizeLanguage(dtoLang) : 'en';
+    let purpose: AppPurpose | null = null;
+    try {
+      const both = await this.supabaseService.client
+        .from('User')
+        .select('language, purpose')
+        .eq('id', userId)
+        .maybeSingle();
+      if (!both.error && both.data) {
+        if (!dtoProvided && typeof (both.data as any).language === 'string') {
+          return { language: normalizeLanguage((both.data as any).language), purpose: normalizePurpose((both.data as any).purpose) };
+        }
+        purpose = normalizePurpose((both.data as any).purpose);
+      } else if (both.error && (both.error.code === '42703' || /language|purpose/i.test(both.error.message || ''))) {
+        // Migrasi parsial (kolom purpose belum ada): baca language saja.
+        const langOnly = await this.supabaseService.client
+          .from('User')
+          .select('language')
+          .eq('id', userId)
+          .maybeSingle();
+        if (!langOnly.error && langOnly.data && !dtoProvided && typeof (langOnly.data as any).language === 'string') {
+          return { language: normalizeLanguage((langOnly.data as any).language), purpose: null };
+        }
+      } else if (both.error) {
+        this.logDbError('resolve user prefs', both.error);
+      }
+    } catch {
+      /* abaikan — pakai default */
+    }
+    return { language, purpose };
   }
 }

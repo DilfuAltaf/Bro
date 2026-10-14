@@ -1,6 +1,7 @@
 import "./globals.css";
 import "katex/dist/katex.min.css";
 import type { Metadata } from "next";
+import LanguageInit from "@/components/shared/LanguageInit";
 
 export const metadata: Metadata = {
   title: "BroAgent - Your Personal AI Assistant",
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-background text-foreground antialiased font-sans">
+        <LanguageInit />
         {children}
       </body>
     </html>
