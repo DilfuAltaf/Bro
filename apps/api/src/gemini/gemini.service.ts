@@ -71,6 +71,10 @@ const DEFAULT_AGENT_URL = 'http://localhost:8000';
 const DEFAULT_GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
 
+/** OpenRouter's OpenAI-compatible surface: `.../api/v1/chat/completions`. */
+const DEFAULT_OR_BASE_URL = 'https://openrouter.ai/api/v1';
+const DEFAULT_OR_MODEL = 'moonshotai/kimi-k2.7-code';
+
 /** Max berapa kali pindah model dalam satu turn (biar nggak kelamaan). */
 const MAX_MODEL_FALLBACKS = 2;
 /** Batas tunggu Retry-After agar satu chat tidak menggantung terlalu lama. */
@@ -119,7 +123,7 @@ function textOf(content: any): string {
   return '';
 }
 
-export type LlmProvider = 'gemini' | 'groq';
+export type LlmProvider = 'gemini' | 'groq' | 'openrouter';
 
 export interface LlmModelOption {
   id: string;
@@ -162,6 +166,36 @@ export const LLM_MODEL_CATALOG: LlmModelOption[] = [
     label: 'GPT-OSS 20B (Groq)',
     provider: 'groq',
     description: 'Ringan & cepat (~1000 tps) via Groq',
+  },
+  {
+    id: 'moonshotai/kimi-k2.7-code',
+    label: 'Kimi K2.7 Code (OR)',
+    provider: 'openrouter',
+    description: 'Agentic coding flagship, great for long tasks',
+  },
+  {
+    id: 'qwen/qwen3-coder-plus',
+    label: 'Qwen3 Coder Plus (OR)',
+    provider: 'openrouter',
+    description: 'Strong coder, 1M context via OpenRouter',
+  },
+  {
+    id: 'deepseek/deepseek-chat',
+    label: 'DeepSeek Chat (OR)',
+    provider: 'openrouter',
+    description: 'Cheap & smart all-rounder',
+  },
+  {
+    id: 'x-ai/grok-code-fast-1',
+    label: 'Grok Code Fast (OR)',
+    provider: 'openrouter',
+    description: 'Very fast & cheap for code',
+  },
+  {
+    id: 'anthropic/claude-sonnet-5',
+    label: 'Claude Sonnet 5 (OR)',
+    provider: 'openrouter',
+    description: 'Best coding quality (paid, pricey)',
   },
 ];
 
@@ -407,6 +441,11 @@ const MODEL_DESCRIPTIONS: Record<AppLanguage, Record<string, string>> = {
     'qwen/qwen3.8-27b': 'Versatile & multilingual via Groq',
     'openai/gpt-oss-120b': 'Flagship open-weight, reasoning + code',
     'openai/gpt-oss-20b': 'Light & fast (~1000 tps) via Groq',
+    'moonshotai/kimi-k2.7-code': 'Agentic coding flagship, great for long tasks',
+    'qwen/qwen3-coder-plus': 'Strong coder, 1M context via OpenRouter',
+    'deepseek/deepseek-chat': 'Cheap & smart all-rounder',
+    'x-ai/grok-code-fast-1': 'Very fast & cheap for code',
+    'anthropic/claude-sonnet-5': 'Best coding quality (paid, pricey)',
   },
   id: {
     'gemini-3.5-flash-lite': 'Cepat & hemat kuota, cocok untuk chat harian',
@@ -414,6 +453,11 @@ const MODEL_DESCRIPTIONS: Record<AppLanguage, Record<string, string>> = {
     'qwen/qwen3.8-27b': 'Serbaguna & multibahasa via Groq',
     'openai/gpt-oss-120b': 'Open-weight flagship, bisa reasoning + code',
     'openai/gpt-oss-20b': 'Ringan & cepat (~1000 tps) via Groq',
+    'moonshotai/kimi-k2.7-code': 'Coding agentic flagship, cocok tugas panjang',
+    'qwen/qwen3-coder-plus': 'Coder kuat, konteks 1M via OpenRouter',
+    'deepseek/deepseek-chat': 'Murah & pintar serbaguna',
+    'x-ai/grok-code-fast-1': 'Sangat cepat & murah untuk kode',
+    'anthropic/claude-sonnet-5': 'Kualitas coding terbaik (berbayar, mahal)',
   },
   ar: {
     'gemini-3.5-flash-lite': 'سريع وموفّر للحصة، مناسب للدردشة اليومية',
@@ -421,6 +465,11 @@ const MODEL_DESCRIPTIONS: Record<AppLanguage, Record<string, string>> = {
     'qwen/qwen3.8-27b': 'متعدد الاستخدامات ومتعدد اللغات عبر Groq',
     'openai/gpt-oss-120b': 'الأقوى مفتوح الأوزان، استدلال + برمجة',
     'openai/gpt-oss-20b': 'خفيف وسريع (~1000 رمز/ث) عبر Groq',
+    'moonshotai/kimi-k2.7-code': 'رائدة البرمجة الوكيلية، ممتازة للمهام الطويلة',
+    'qwen/qwen3-coder-plus': 'مبرمج قوي، سياق مليون عبر OpenRouter',
+    'deepseek/deepseek-chat': 'رخيص وذكي متعدد الاستخدامات',
+    'x-ai/grok-code-fast-1': 'سريع جداً ورخيص للبرمجة',
+    'anthropic/claude-sonnet-5': 'أفضل جودة برمجة (مدفوع)',
   },
   ru: {
     'gemini-3.5-flash-lite': 'Быстрая и экономная, для ежедневного чата',
@@ -428,6 +477,11 @@ const MODEL_DESCRIPTIONS: Record<AppLanguage, Record<string, string>> = {
     'qwen/qwen3.8-27b': 'Универсальная и многоязычная via Groq',
     'openai/gpt-oss-120b': 'Флагман open-weight: рассуждения + код',
     'openai/gpt-oss-20b': 'Лёгкая и быстрая (~1000 ток/с) via Groq',
+    'moonshotai/kimi-k2.7-code': 'Флагман агентного кодинга, для длинных задач',
+    'qwen/qwen3-coder-plus': 'Сильный кодер, контекст 1M via OpenRouter',
+    'deepseek/deepseek-chat': 'Дешёвый и умный универсал',
+    'x-ai/grok-code-fast-1': 'Очень быстрый и дешёвый для кода',
+    'anthropic/claude-sonnet-5': 'Лучшее качество кода (платно)',
   },
   zh: {
     'gemini-3.5-flash-lite': '快速省配额，适合日常聊天',
@@ -435,6 +489,11 @@ const MODEL_DESCRIPTIONS: Record<AppLanguage, Record<string, string>> = {
     'qwen/qwen3.8-27b': '多功能多语言 (Groq)',
     'openai/gpt-oss-120b': '旗舰开源权重，推理 + 代码',
     'openai/gpt-oss-20b': '轻量快速 (~1000 tps, Groq)',
+    'moonshotai/kimi-k2.7-code': 'Agentic 编程旗舰，适合长任务',
+    'qwen/qwen3-coder-plus': '强力代码模型，1M 上下文',
+    'deepseek/deepseek-chat': '便宜好用的全能模型',
+    'x-ai/grok-code-fast-1': '写代码又快又便宜',
+    'anthropic/claude-sonnet-5': '代码质量最佳 (付费较贵)',
   },
   ja: {
     'gemini-3.5-flash-lite': '高速・省 quota、日常チャットに最適',
@@ -442,6 +501,11 @@ const MODEL_DESCRIPTIONS: Record<AppLanguage, Record<string, string>> = {
     'qwen/qwen3.8-27b': '多機能・多言語 (Groq)',
     'openai/gpt-oss-120b': '旗艦オープンウェイト、推論 + コード',
     'openai/gpt-oss-20b': '軽量・高速 (~1000 tps, Groq)',
+    'moonshotai/kimi-k2.7-code': 'エージェント型コーディングの旗艦、長期タスクに強い',
+    'qwen/qwen3-coder-plus': '強力なコーダー、1Mコンテキスト',
+    'deepseek/deepseek-chat': '安くて賢い万能モデル',
+    'x-ai/grok-code-fast-1': '高速・格安なコード生成',
+    'anthropic/claude-sonnet-5': '最高のコード品質 (有料)',
   },
   ko: {
     'gemini-3.5-flash-lite': '빠르고 할당량 절약, 일상 채팅에 최적',
@@ -449,6 +513,11 @@ const MODEL_DESCRIPTIONS: Record<AppLanguage, Record<string, string>> = {
     'qwen/qwen3.8-27b': '다재다능·다국어 (Groq)',
     'openai/gpt-oss-120b': '플래그십 오픈 웨이트, 추론 + 코드',
     'openai/gpt-oss-20b': '가볍고 빠름 (~1000 tps, Groq)',
+    'moonshotai/kimi-k2.7-code': '에이전트 코딩 플래그십, 긴 작업에 강함',
+    'qwen/qwen3-coder-plus': '강력한 코더, 1M 컨텍스트',
+    'deepseek/deepseek-chat': '싸고 똑똑한 만능 모델',
+    'x-ai/grok-code-fast-1': '빠르고 저렴한 코드 생성',
+    'anthropic/claude-sonnet-5': '최고 코드 품질 (유료)',
   },
 };
 
@@ -457,13 +526,17 @@ export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
   private readonly openai: OpenAI;
   private readonly groq: OpenAI;
+  private readonly openrouter: OpenAI;
   private readonly baseUrl: string;
   private readonly agentUrl: string;
   private readonly apiKey: string;
   private readonly groqBaseUrl: string;
   private readonly groqApiKey: string;
+  private readonly orBaseUrl: string;
+  private readonly orApiKey: string;
   readonly model: string;
   readonly groqModel: string;
+  readonly orModel: string;
 
   constructor(private readonly config: ConfigService) {
     this.baseUrl = (
@@ -480,12 +553,21 @@ export class GeminiService {
     this.groqApiKey = this.config.get<string>('GROQ_API_KEY')?.trim() || '';
     this.groqModel =
       this.config.get<string>('GROQ_MODEL')?.trim() || DEFAULT_GROQ_MODEL;
+    this.orBaseUrl = (
+      this.config.get<string>('OPENROUTER_BASE_URL') || DEFAULT_OR_BASE_URL
+    ).replace(/\/+$/, '');
+    this.orApiKey = this.config.get<string>('OPENROUTER_API_KEY')?.trim() || '';
+    this.orModel =
+      this.config.get<string>('OPENROUTER_MODEL')?.trim() || DEFAULT_OR_MODEL;
 
     if (!this.apiKey) {
       this.logger.error('GEMINI_API_KEY is empty. Chat requests will fail.');
     }
     if (!this.groqApiKey) {
       this.logger.warn('GROQ_API_KEY is empty. Groq models will be unavailable.');
+    }
+    if (!this.orApiKey) {
+      this.logger.warn('OPENROUTER_API_KEY is empty. OpenRouter models will be unavailable.');
     }
 
     this.openai = new OpenAI({
@@ -504,8 +586,34 @@ export class GeminiService {
       maxRetries: 0,
     });
 
+    this.openrouter = new OpenAI({
+      baseURL: this.orBaseUrl,
+      apiKey: this.orApiKey || 'openrouter-api-key-not-configured',
+      timeout: Number(this.config.get<string>('OPENROUTER_TIMEOUT_MS') || 120_000),
+      maxRetries: 0,
+      defaultHeaders: {
+        'HTTP-Referer': 'https://broagent.app',
+        'X-Title': 'BroAgent',
+      },
+    });
+
     this.logger.log(`Gemini client ready (base=${this.baseUrl}, model=${this.model})`);
     this.logger.log(`Groq client ready (base=${this.groqBaseUrl}, model=${this.groqModel})`);
+    this.logger.log(`OpenRouter client ready (base=${this.orBaseUrl}, model=${this.orModel})`);
+  }
+
+  /** True kalau provider punya API key di server. */
+  private hasProviderKey(provider: LlmProvider): boolean {
+    if (provider === 'groq') return Boolean(this.groqApiKey);
+    if (provider === 'openrouter') return Boolean(this.orApiKey);
+    return Boolean(this.apiKey);
+  }
+
+  /** HTTP client OpenAI-compatible per provider. */
+  private clientFor(provider: LlmProvider): OpenAI {
+    if (provider === 'groq') return this.groq;
+    if (provider === 'openrouter') return this.openrouter;
+    return this.openai;
   }
 
   /** Daftar model untuk dropdown frontend, lengkap dengan status ketersediaan key. */
@@ -515,7 +623,7 @@ export class GeminiService {
     return LLM_MODEL_CATALOG.map((m) => ({
       ...m,
       description: desc[m.id] || m.description,
-      available: m.provider === 'gemini' ? Boolean(this.apiKey) : Boolean(this.groqApiKey),
+      available: this.hasProviderKey(m.provider),
     }));
   }
 
@@ -527,39 +635,54 @@ export class GeminiService {
     if (!requested || typeof requested !== 'string') return fallback;
     const found = LLM_MODEL_CATALOG.find((m) => m.id === requested.trim());
     if (found) return { provider: found.provider, model: found.id };
-    // Izinkan custom model ID: anggap Groq jika diawali prefix Groq yang dikenal.
     const trimmed = requested.trim();
+    // Keluarga model yang jelas milik OpenRouter (tidak ada di Groq).
+    if (/^(moonshotai\/|x-ai\/|anthropic\/|z-ai\/)/i.test(trimmed) && this.orApiKey) {
+      return { provider: 'openrouter', model: trimmed };
+    }
+    // Izinkan custom model ID: anggap Groq jika diawali prefix Groq yang dikenal.
     if (/^(llama|qwen|openai\/|mixtral|gemma|deepseek)/i.test(trimmed)) {
       return { provider: 'groq', model: trimmed };
     }
     if (/^gemini/i.test(trimmed)) {
       return { provider: 'gemini', model: trimmed };
     }
+    // ID gaya "org/model" lainnya → OpenRouter bila key tersedia.
+    if (trimmed.includes('/') && this.orApiKey) {
+      return { provider: 'openrouter', model: trimmed };
+    }
     return fallback;
   }
 
-  /** True untuk error kuota/rate-limit/sibuk — layak dicoba ke model lain. */
+  /** True untuk error kuota/rate-limit/sibuk/kredit — layak dicoba ke model lain. */
   private static isCapacityError(error: any): boolean {
     const status = error?.status;
-    if (status === 429 || status === 503) return true;
+    if (status === 429 || status === 503 || status === 402) return true;
     const raw = typeof error?.message === 'string' ? error.message : String(error);
-    return /quota|RESOURCE_EXHAUSTED|rate_limit|rate limit|overloaded|UNAVAILABLE/i.test(raw);
+    return /quota|insufficient_credit|RESOURCE_EXHAUSTED|rate_limit|rate limit|overloaded|UNAVAILABLE/i.test(raw);
   }
 
   /**
-   * Urutan model pengganti saat model utama kena limit: model Groq lain dulu,
-   * terakhir Gemini — kecuali `onlyProvider` diisi (mis. vision → sesama Gemini).
-   * Hanya model yang API key-nya tersedia di server.
+   * Urutan model pengganti saat model utama kena limit: Groq dulu (gratis),
+   * lalu OpenRouter, terakhir Gemini — kecuali `onlyProvider` diisi
+   * (mis. vision → sesama Gemini). Hanya model yang API key-nya tersedia.
    */
+  private static readonly PROVIDER_FALLBACK_ORDER: Record<LlmProvider, number> = {
+    groq: 0,
+    openrouter: 1,
+    gemini: 2,
+  };
+
   private fallbackChain(failedModel: string, onlyProvider?: LlmProvider): string[] {
     const failed = (failedModel || '').trim();
+    const order = GeminiService.PROVIDER_FALLBACK_ORDER;
     return LLM_MODEL_CATALOG.filter(
       (m) =>
         m.id !== failed &&
         (!onlyProvider || m.provider === onlyProvider) &&
-        (m.provider === 'gemini' ? Boolean(this.apiKey) : Boolean(this.groqApiKey)),
+        this.hasProviderKey(m.provider),
     )
-      .sort((a, b) => (a.provider === b.provider ? 0 : a.provider === 'groq' ? -1 : 1))
+      .sort((a, b) => order[a.provider] - order[b.provider])
       .slice(0, MAX_MODEL_FALLBACKS)
       .map((m) => m.id);
   }
@@ -595,8 +718,8 @@ export class GeminiService {
     return GeminiService.friendlyError(error, provider);
   }
 
-  async checkHealth(): Promise<GeminiHealth & { groq?: GeminiHealth; models?: Array<LlmModelOption & { available: boolean }> }> {
-    const health: GeminiHealth & { groq?: GeminiHealth; models?: Array<LlmModelOption & { available: boolean }> } = {
+  async checkHealth(): Promise<GeminiHealth & { groq?: GeminiHealth; openrouter?: GeminiHealth; models?: Array<LlmModelOption & { available: boolean }> }> {
+    const health: GeminiHealth & { groq?: GeminiHealth; openrouter?: GeminiHealth; models?: Array<LlmModelOption & { available: boolean }> } = {
       reachable: false,
       baseUrl: this.baseUrl,
       model: this.model,
@@ -644,6 +767,30 @@ export class GeminiService {
       }
     }
     health.groq = groqHealth;
+
+    // OpenRouter health (tidak menggagalkan health utama jika belum dikonfigurasi)
+    const orHealth: GeminiHealth = {
+      reachable: false,
+      baseUrl: this.orBaseUrl,
+      model: this.orModel,
+    };
+    if (!this.orApiKey) {
+      orHealth.error = 'OPENROUTER_API_KEY is not configured';
+    } else {
+      try {
+        const res = await fetch(`${this.orBaseUrl}/models`, {
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) {
+          orHealth.error = `OpenRouter /models returned HTTP ${res.status}`;
+        } else {
+          orHealth.reachable = true;
+        }
+      } catch (error) {
+        orHealth.error = `OpenRouter unreachable: ${GeminiService.describe(error)}`;
+      }
+    }
+    health.openrouter = orHealth;
     health.models = this.listModels();
     return health;
   }
@@ -685,7 +832,7 @@ export class GeminiService {
     for (let i = 0; i < attempts.length; i += 1) {
       const { provider, model } = this.resolveModel(attempts[i]);
       lastProvider = provider;
-      const client = provider === 'groq' ? this.groq : this.openai;
+      const client = this.clientFor(provider);
       try {
         this.assertProviderKey(provider);
         const completion = await client.chat.completions.create({
@@ -759,7 +906,7 @@ export class GeminiService {
     for (let i = 0; i < attempts.length; i += 1) {
       const { provider, model } = this.resolveModel(attempts[i]);
       lastProvider = provider;
-      const client = provider === 'groq' ? this.groq : this.openai;
+      const client = this.clientFor(provider);
       if (actual) actual.modelId = model;
 
       let stream;
@@ -801,7 +948,12 @@ export class GeminiService {
   private assertProviderKey(provider: LlmProvider): void {
     if (provider === 'groq' && !this.groqApiKey) {
       throw new Error(
-        'A Groq model was selected but GROQ_API_KEY is missing. Add GROQ_API_KEY to .env or choose a Gemini model.',
+        'A Groq model was selected but GROQ_API_KEY is missing. Add GROQ_API_KEY to .env or choose another model.',
+      );
+    }
+    if (provider === 'openrouter' && !this.orApiKey) {
+      throw new Error(
+        'An OpenRouter model was selected but OPENROUTER_API_KEY is missing. Add OPENROUTER_API_KEY to .env or choose another model.',
       );
     }
     if (provider === 'gemini' && !this.apiKey) {
@@ -939,17 +1091,28 @@ export class GeminiService {
   private static friendlyError(error: any, provider: LlmProvider = 'gemini'): string {
     const status = error?.status;
     const raw = typeof error?.message === 'string' ? error.message : String(error);
-    const name = provider === 'groq' ? 'Groq' : 'Gemini';
+    const name = provider === 'groq' ? 'Groq' : provider === 'openrouter' ? 'OpenRouter' : 'Gemini';
 
+    if (status === 402 || /insufficient_credit|insufficient credits|credit.*exhausted/i.test(raw)) {
+      return 'OpenRouter credit is empty. Top up credit at openrouter.ai/credits or switch to a free model.';
+    }
     if (status === 429 || /quota|RESOURCE_EXHAUSTED|rate_limit|rate limit/i.test(raw)) {
-      return provider === 'groq'
-        ? 'Groq quota/rate-limit exceeded. Wait a moment and try again, or switch to a Gemini model.'
-        : 'Daily AI quota exceeded. Try again later or enable billing in Google AI Studio.';
+      if (provider === 'groq') {
+        return 'Groq quota/rate-limit exceeded. Wait a moment and try again, or switch to another model.';
+      }
+      if (provider === 'openrouter') {
+        return 'OpenRouter rate-limit exceeded. Wait a moment and try again, or switch to another model.';
+      }
+      return 'Daily AI quota exceeded. Try again later or enable billing in Google AI Studio.';
     }
     if (status === 401 || status === 403 || /api key|UNAUTHENTICATED|invalid authentication|invalid_api_key/i.test(raw)) {
-      return provider === 'groq'
-        ? 'Groq API key misconfigured. Check GROQ_API_KEY in the .env file.'
-        : 'Gemini API key misconfigured. Check GEMINI_API_KEY.';
+      if (provider === 'groq') {
+        return 'Groq API key misconfigured. Check GROQ_API_KEY in the .env file.';
+      }
+      if (provider === 'openrouter') {
+        return 'OpenRouter API key misconfigured. Check OPENROUTER_API_KEY in the .env file.';
+      }
+      return 'Gemini API key misconfigured. Check GEMINI_API_KEY.';
     }
     if (status === 404 || /model_not_found|does not exist|not found/i.test(raw)) {
       return `Model not found on ${name}. Please choose another model from the list.`;

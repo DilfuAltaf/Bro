@@ -40,10 +40,17 @@ const AVAILABLE_MODES = [
 type LlmModelOption = {
   id: string;
   label: string;
-  provider: 'gemini' | 'groq';
+  provider: 'gemini' | 'groq' | 'openrouter';
   description: string;
   available?: boolean;
 };
+
+/** Warna badge per provider. */
+function providerBadge(provider: string): string {
+  if (provider === 'groq') return 'bg-emerald-500/15 text-emerald-400';
+  if (provider === 'openrouter') return 'bg-violet-500/15 text-violet-400';
+  return 'bg-sky-500/15 text-sky-400';
+}
 
 const FALLBACK_LLM_MODELS: LlmModelOption[] = [
   { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', provider: 'gemini', description: 'Fast & quota-friendly' },
@@ -51,6 +58,11 @@ const FALLBACK_LLM_MODELS: LlmModelOption[] = [
   { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B (Groq)', provider: 'groq', description: 'Versatile & multilingual' },
   { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B (Groq)', provider: 'groq', description: 'Flagship open-weight' },
   { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B (Groq)', provider: 'groq', description: 'Light & fast' },
+  { id: 'moonshotai/kimi-k2.7-code', label: 'Kimi K2.7 Code (OR)', provider: 'openrouter', description: 'Agentic coding flagship' },
+  { id: 'qwen/qwen3-coder-plus', label: 'Qwen3 Coder Plus (OR)', provider: 'openrouter', description: 'Strong coder, 1M context' },
+  { id: 'deepseek/deepseek-chat', label: 'DeepSeek Chat (OR)', provider: 'openrouter', description: 'Cheap & smart all-rounder' },
+  { id: 'x-ai/grok-code-fast-1', label: 'Grok Code Fast (OR)', provider: 'openrouter', description: 'Very fast & cheap for code' },
+  { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5 (OR)', provider: 'openrouter', description: 'Best coding quality (paid)' },
 ];
 
 /** Nama pendek model untuk label (buang prefix provider seperti "openai/"). */
@@ -485,9 +497,7 @@ function ChatPageContent() {
             >
               <Cpu className="w-4 h-4 text-[#8B8B98] shrink-0" />
               <span className="text-sm font-medium text-[#F5F5F5] truncate">{activeModelObj?.label || selectedModel}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide shrink-0 ${
-                activeModelObj?.provider === 'groq' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400'
-              }`}>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide shrink-0 ${providerBadge(activeModelObj?.provider || '')}`}>
                 {activeModelObj?.provider || 'llm'}
               </span>
               <ChevronDown className="w-4 h-4 text-[#8B8B98] shrink-0" />
@@ -524,9 +534,7 @@ function ChatPageContent() {
                           <span className="block text-[11px] text-amber-400">{tt('chat.modelUnavailable')}</span>
                         )}
                       </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase shrink-0 ${
-                        m.provider === 'groq' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400'
-                      }`}>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase shrink-0 ${providerBadge(m.provider)}`}>
                         {m.provider}
                       </span>
                     </button>
