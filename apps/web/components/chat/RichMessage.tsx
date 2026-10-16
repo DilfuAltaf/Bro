@@ -270,7 +270,7 @@ function MathSpan({ tex, display }: { tex: string; display: boolean }) {
   if (display) {
     return (
       <span
-        className="block overflow-x-auto py-1 text-center [&>.katex-display]:my-0"
+        className="block overflow-x-auto max-w-full py-1 text-center [&>.katex-display]:my-0 [&>.katex-display]:max-w-full"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     );
@@ -360,12 +360,12 @@ function tableToTsv(header: string[], rows: string[][]): string {
 
 function CodeBlock({ codeLang, code, uiLang }: { codeLang: string; code: string; uiLang: AppLang }) {
   return (
-    <div className="rounded-lg overflow-hidden border border-[#24242D] bg-[#0d0d12]">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#111116] border-b border-[#24242D]">
-        <span className="text-xs text-[#8B8B98] font-mono">{codeLang || t(uiLang, 'code.name')}</span>
+    <div className="rounded-lg overflow-hidden border border-[#24242D] bg-[#0d0d12] max-w-full min-w-0">
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[#111116] border-b border-[#24242D] min-w-0">
+        <span className="text-xs text-[#8B8B98] font-mono truncate min-w-0">{codeLang || t(uiLang, 'code.name')}</span>
         <CopyButton text={code} lang={uiLang} />
       </div>
-      <pre className="p-3 overflow-x-auto text-[13px] leading-relaxed font-mono text-[#e5e5ea] whitespace-pre">
+      <pre className="p-2.5 sm:p-3 overflow-x-auto text-xs sm:text-[13px] leading-relaxed font-mono text-[#e5e5ea] whitespace-pre max-w-full">
         {code || ' '}
       </pre>
     </div>
@@ -380,14 +380,14 @@ const ALIGN_CLASS: Record<Align, string> = {
 
 function TableBlock({ header, align, rows, uiLang }: { header: string[]; align: Align[]; rows: string[][]; uiLang: AppLang }) {
   return (
-    <div className="rounded-lg overflow-hidden border border-[#24242D]">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#111116] border-b border-[#24242D]">
-        <span className="text-xs text-[#8B8B98]">
+    <div className="rounded-lg overflow-hidden border border-[#24242D] max-w-full min-w-0">
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[#111116] border-b border-[#24242D] min-w-0">
+        <span className="text-xs text-[#8B8B98] truncate min-w-0">
           {t(uiLang, 'table.name')} • {header.length} {t(uiLang, 'table.cols')} • {rows.length} {t(uiLang, 'table.rows')}
         </span>
         <CopyButton text={tableToTsv(header, rows)} label={t(uiLang, 'table.copyTsv')} lang={uiLang} />
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto max-w-full">
         <table className="w-full text-sm border-collapse min-w-[320px]">
           <thead>
             <tr className="bg-[#111116]">
@@ -434,7 +434,7 @@ export function RichMessage({ content, lang }: { content: string; lang?: string 
   const blocks = parseMarkdown(content);
 
   return (
-    <div className="flex flex-col gap-2.5 w-full min-w-0">
+    <div className="flex flex-col gap-2.5 w-full min-w-0 max-w-full break-words [overflow-wrap:anywhere]">
       {blocks.map((b, idx) => {
         switch (b.kind) {
           case 'heading':
@@ -483,7 +483,7 @@ export function RichMessage({ content, lang }: { content: string; lang?: string 
           case 'paragraph':
           default:
             return (
-              <p key={idx} className="whitespace-pre-wrap text-[#e5e5ea]">
+              <p key={idx} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#e5e5ea]">
                 {renderInline(b.text, `p${idx}`)}
               </p>
             );

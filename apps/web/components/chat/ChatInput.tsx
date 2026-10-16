@@ -239,7 +239,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto relative flex flex-col bg-[#111116] border border-[#24242D] p-3 rounded-2xl focus-within:border-[#8B8B98] transition-colors shadow-sm">
+    <div className="max-w-3xl mx-auto relative flex flex-col bg-[#111116] border border-[#24242D] p-2.5 sm:p-3 rounded-2xl focus-within:border-[#8B8B98] transition-colors shadow-sm min-w-0">
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2 px-2">
           {attachments.map((att) => (
@@ -278,7 +278,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
         disabled={disabled}
         dir="auto"
         rows={1}
-        className="w-full max-h-[200px] bg-transparent resize-none outline-none text-[#F5F5F5] px-2 py-1 placeholder:text-[#8B8B98] custom-scrollbar disabled:opacity-50"
+        className="w-full max-h-[200px] bg-transparent resize-none outline-none text-base text-[#F5F5F5] px-2 py-1 placeholder:text-[#8B8B98] custom-scrollbar disabled:opacity-50 min-w-0"
         style={{ minHeight: '44px' }}
       />
 
@@ -316,7 +316,7 @@ export default function ChatInput({ onSend, disabled, lang }: Props) {
               <Plus className="w-5 h-5" />
             </button>
             {isAttachOpen && (
-              <div className="absolute bottom-full left-0 mb-2 w-60 bg-[#16161D] border border-[#24242D] rounded-xl shadow-xl py-1.5 z-50">
+              <div className="absolute bottom-full left-0 mb-2 w-60 max-w-[calc(100vw-3rem)] bg-[#16161D] border border-[#24242D] rounded-xl shadow-xl py-1.5 z-50">
                 <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-[#8B8B98]">
                   {tt('attach.title')}
                 </div>

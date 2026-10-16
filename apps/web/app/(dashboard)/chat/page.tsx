@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import ChatWindow from '@/components/chat/ChatWindow';
 import ChatInput from '@/components/chat/ChatInput';
 import { MAX_DOCS_PER_MESSAGE, MAX_IMAGES_PER_MESSAGE, OutgoingAttachment } from '@/lib/attachments';
-import { ChevronDown, GraduationCap, Microscope, Lightbulb, FileText, LifeBuoy, Zap, Cpu, Check, OctagonAlert, ArrowRightLeft } from 'lucide-react';
+import { ChevronDown, GraduationCap, Microscope, Lightbulb, FileText, LifeBuoy, Zap, Cpu, Check, OctagonAlert, ArrowRightLeft, Menu } from 'lucide-react';
 import { PREF_KEYS } from '@/components/shared/SettingsModal';
 import { getStoredLang, getStoredPurpose, normalizePurpose, purposeDefaultMode, setStoredPurpose, sttForLang, syncLangFromServer, tx, useAppLanguage } from '@/lib/i18n';
 
@@ -452,21 +452,29 @@ function ChatPageContent() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#09090B]">
-      <header className="h-14 border-b border-[#24242D] flex items-center justify-between px-6 shrink-0 bg-[#09090B] gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-3 relative" ref={dropdownRef}>
+    <div className="flex flex-col h-full min-h-0 bg-[#09090B]">
+      <header className="min-h-14 border-b border-[#24242D] flex items-center justify-between px-2 sm:px-6 py-1.5 shrink-0 bg-[#09090B] gap-1.5 sm:gap-3">
+        <div className="flex items-center gap-0.5 sm:gap-2 min-w-0 flex-1">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('bro-sidebar-toggle'))}
+            className="p-2 text-[#8B8B98] hover:text-[#F5F5F5] hover:bg-[#111116] rounded-lg transition-colors shrink-0"
+            title="Buka/tutup sidebar"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-1 sm:gap-3 relative shrink-0" ref={dropdownRef}>
             <button 
               onClick={() => setIsModeOpen(!isModeOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-[#111116] transition-colors border border-transparent hover:border-[#24242D]"
+              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-md hover:bg-[#111116] transition-colors border border-transparent hover:border-[#24242D] min-w-0"
             >
-              <ActiveIcon className="w-4 h-4 text-[#8B8B98]" />
-              <span className="text-sm font-medium text-[#F5F5F5]">{activeModeLabel}</span>
-              <ChevronDown className="w-4 h-4 text-[#8B8B98]" />
+              <ActiveIcon className="w-4 h-4 text-[#8B8B98] shrink-0" />
+              <span className="text-sm font-medium text-[#F5F5F5] truncate max-w-[72px] sm:max-w-none">{activeModeLabel}</span>
+              <ChevronDown className="w-4 h-4 text-[#8B8B98] shrink-0" />
             </button>
 
             {isModeOpen && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-[#111116] border border-[#24242D] rounded-lg shadow-xl py-1 z-50">
+              <div className="absolute top-full left-0 mt-1 w-48 max-w-[calc(100vw-2rem)] bg-[#111116] border border-[#24242D] rounded-lg shadow-xl py-1 z-50">
                 {AVAILABLE_MODES.map(m => {
                   const Icon = m.icon;
                   return (
@@ -489,22 +497,22 @@ function ChatPageContent() {
             <span className="text-xs text-[#8B8B98] font-medium">{tt('chat.online')}</span>
           </div>
 
-          <div className="flex items-center gap-2 relative" ref={modelDropdownRef}>
+          <div className="flex items-center gap-1 sm:gap-2 relative min-w-0" ref={modelDropdownRef}>
             <button
               onClick={() => setIsModelOpen(!isModelOpen)}
               title={activeModelObj?.description || activeModelObj?.id}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111116] border border-[#24242D] hover:border-[#8B8B98] transition-colors max-w-[220px]"
+              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-md bg-[#111116] border border-[#24242D] hover:border-[#8B8B98] transition-colors max-w-[128px] sm:max-w-[220px] min-w-0"
             >
               <Cpu className="w-4 h-4 text-[#8B8B98] shrink-0" />
-              <span className="text-sm font-medium text-[#F5F5F5] truncate">{activeModelObj?.label || selectedModel}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide shrink-0 ${providerBadge(activeModelObj?.provider || '')}`}>
+              <span className="text-sm font-medium text-[#F5F5F5] truncate min-w-0">{activeModelObj?.label || selectedModel}</span>
+              <span className={`hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide shrink-0 ${providerBadge(activeModelObj?.provider || '')}`}>
                 {activeModelObj?.provider || 'llm'}
               </span>
               <ChevronDown className="w-4 h-4 text-[#8B8B98] shrink-0" />
             </button>
 
             {isModelOpen && (
-              <div className="absolute top-full left-0 mt-1 w-72 bg-[#111116] border border-[#24242D] rounded-lg shadow-xl py-1 z-50">
+              <div className="absolute top-full left-0 mt-1 w-72 max-w-[calc(100vw-2rem)] bg-[#111116] border border-[#24242D] rounded-lg shadow-xl py-1 z-50">
                 <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-[#8B8B98]">{tt('chat.selectModel')}</div>
                 {llmModels.map((m) => {
                   const unavailable = m.available === false;
@@ -548,29 +556,29 @@ function ChatPageContent() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {limitBadge && (
             <span
               title={limitBadge.kind === 'limit'
                 ? tt('chat.limitOutTitle')
                 : tt('chat.limitFallbackTitle')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide border ${
+              className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide border max-w-[36vw] sm:max-w-none truncate ${
                 limitBadge.kind === 'limit'
                   ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse'
                   : 'bg-sky-500/15 text-sky-400 border-sky-500/30'
               }`}
             >
               {limitBadge.kind === 'limit'
-                ? <OctagonAlert className="w-3.5 h-3.5" />
-                : <ArrowRightLeft className="w-3.5 h-3.5" />}
-              {limitBadge.text}
+                ? <OctagonAlert className="w-3.5 h-3.5 shrink-0" />
+                : <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />}
+              <span className="truncate">{limitBadge.text}</span>
             </span>
           )}
           {error && <span className="text-red-400 text-sm hidden md:inline max-w-[300px] truncate" title={error}>{error}</span>}
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         <ChatWindow
           messages={messages}
           isLoading={isLoading}
@@ -578,7 +586,7 @@ function ChatPageContent() {
           onSendMessage={(text) => void handleSendMessage(text)}
           onRegenerateMessage={handleRegenerate}
         />
-        <div className="p-4 bg-[#09090B]">
+        <div className="p-2 sm:p-4 bg-[#09090B] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
           <ChatInput onSend={handleSendMessage} disabled={isLoading} lang={sttLang} />
         </div>
       </div>

@@ -34,13 +34,13 @@ export default function ChatWindow({ messages, isLoading, onModeSelect, onSendMe
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8">
-        <div className="mb-6 flex flex-col items-center justify-center">
-            <img src="/logo.png" alt="AI" className="w-16 h-16 object-contain mb-4" />
-            <h2 className="text-3xl font-semibold text-[#F5F5F5] mb-2">{tt('chat.emptyTitle')}</h2>
-            <p className="text-sm text-[#8B8B98] mb-8">{tt('chat.emptySub')}</p>
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center p-4 sm:p-8">
+        <div className="mb-6 flex flex-col items-center justify-center text-center">
+            <img src="/logo.png" alt="AI" className="w-14 h-14 sm:w-16 sm:h-16 object-contain mb-4" />
+            <h2 className="text-2xl sm:text-3xl font-semibold text-[#F5F5F5] mb-2">{tt('chat.emptyTitle')}</h2>
+            <p className="text-sm text-[#8B8B98] mb-6 sm:mb-8">{tt('chat.emptySub')}</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-2xl w-full">
           <button onClick={() => onModeSelect?.('learning')} className="flex flex-col items-start p-4 bg-[#111116] border border-[#24242D] rounded-xl hover:bg-[#16161D] transition-colors group">
             <GraduationCap className="w-5 h-5 text-[#8B8B98] group-hover:text-[#F5F5F5] mb-2" />
             <span className="text-sm font-medium text-[#F5F5F5]">{tt('mode.learning')}</span>
@@ -83,8 +83,8 @@ export default function ChatWindow({ messages, isLoading, onModeSelect, onSendMe
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-      <div className="max-w-3xl mx-auto w-full space-y-6">
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-clip p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+      <div className="max-w-3xl mx-auto w-full min-w-0 space-y-4 sm:space-y-6">
         {messages.map((msg) => (
           <MessageBubble
             key={msg.id}

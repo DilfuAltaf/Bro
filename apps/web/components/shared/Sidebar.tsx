@@ -1,13 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { MessageSquarePlus, Clock, Settings, LogOut, UserCircle, Pencil, Trash2, Check, X, TriangleAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { MessageSquarePlus, Clock, Settings, LogOut, UserCircle, Pencil, Trash2, Check, X, TriangleAlert, PanelLeftClose } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import SettingsModal from './SettingsModal';
 import { tx, useAppLanguage } from '@/lib/i18n';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+// Lebar sidebar desktop (bisa digeser), tersimpan di localStorage.
+const SB_MIN_W = 200;
+const SB_MAX_W = 420;
+const SB_DEFAULT_W = 256;
+const SB_WIDTH_KEY = 'bro-sidebar-width';
+const SB_COLLAPSED_KEY = 'bro-sidebar-collapsed';
 
 export default function Sidebar() {
   const { lang, tt } = useAppLanguage();
@@ -19,7 +26,34 @@ export default function Sidebar() {
   // Target hapus yang menunggu konfirmasi (tidak langsung hapus).
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Drawer di mobile: tertutup default, dibuka via tombol hamburger di header chat.
+  const [mobileOpen, setMobileOpen] = useState(false);
+  // Collapse (desktop) + lebar geser (desktop). Persist biar nempel.
+  const [collapsed, setCollapsed] = useState(false);
+  const [sbWidth, setSbWidth] = useState(SB_DEFAULT_W);
+  const sbWidthRef = useRef(SB_DEFAULT_W);
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Baca preferensi tersimpan (client only).
+  useEffect(() => {
+    try {
+      const w = parseInt(localStorage.getItem(SB_WIDTH_KEY) || '', 10);
+      if (Number.isFinite(w)) {
+        const clamped = Math.min(SB_MAX_W, Math.max(SB_MIN_W, w));
+        setSbWidth(clamped);
+        sbWidthRef.current = clamped;
+      }
+      if (localStorage.getItem(SB_COLLAPSED_KEY) === '1') setCollapsed(true);
+    } catch { /* abaikan */ }
+  }, []);
+
+  const setCollapsedPersist = (v: boolean) => {
+    setCollapsed(v);
+    try {
+      localStorage.setItem(SB_COLLAPSED_KEY, v ? '1' : '0');
+    } catch { /* abaikan */ }
+  };
 
   const loadHistory = () => {
     fetch(`${API_URL}/conversations`, { credentials: 'include' })
@@ -83,6 +117,85 @@ export default function Sidebar() {
     return () => document.removeEventListener('keydown', onKey);
   }, [deleteTarget]);
 
+  // Toggle hamburger: di layar md+ (laptop) buka/tutup sidebar,
+  // di bawah itu (HP / browser dikecilin) buka/tutup drawer.
+  const isDesktopWidth = () =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+
+  // Drawer mobile: dengarkan toggle dari header chat + tutup saat pindah halaman.
+  useEffect(() => {
+    const onToggle = () => {
+      if (isDesktopWidth()) {
+        setCollapsed((v) => {
+          const next = !v;
+          try {
+            localStorage.setItem(SB_COLLAPSED_KEY, next ? '1' : '0');
+          } catch { /* abaikan */ }
+          return next;
+        });
+      } else {
+        setMobileOpen((v) => !v);
+      }
+    };
+    const onClose = () => setMobileOpen(false);
+    window.addEventListener('bro-sidebar-toggle', onToggle);
+    window.addEventListener('bro-sidebar-close', onClose);
+    return () => {
+      window.removeEventListener('bro-sidebar-toggle', onToggle);
+      window.removeEventListener('bro-sidebar-close', onClose);
+    };
+  }, []);
+
+  // Geser tepi kanan sidebar buat gede-kecilin (desktop, pointer drag).
+  const startResize = (e: React.PointerEvent) => {
+    if (!isDesktopWidth()) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sbWidthRef.current;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.min(SB_MAX_W, Math.max(SB_MIN_W, startW + ev.clientX - startX));
+      sbWidthRef.current = next;
+      setSbWidth(next);
+    };
+    const onUp = () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try {
+        localStorage.setItem(SB_WIDTH_KEY, String(sbWidthRef.current));
+      } catch { /* abaikan */ }
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
+  const resetWidth = () => {
+    sbWidthRef.current = SB_DEFAULT_W;
+    setSbWidth(SB_DEFAULT_W);
+    try {
+      localStorage.setItem(SB_WIDTH_KEY, String(SB_DEFAULT_W));
+    } catch { /* abaikan */ }
+  };
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Kunci scroll body saat drawer mobile terbuka.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
+
   useEffect(() => {
     fetch(`${API_URL}/auth/me`, { credentials: 'include' })
       .then(res => {
@@ -133,17 +246,47 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-[#09090B] border-r border-[#24242D] flex flex-col h-full text-[#F5F5F5]">
-      <div className="p-5 border-b border-[#24242D]">
-        <Link href="/" className="flex items-center gap-3">
-          <img src="/logo.png" alt="BroAgent Logo" className="w-8 h-8 object-contain rounded-md" />
-          <div className="text-xl font-semibold tracking-tight text-[#F5F5F5]">BroAgent</div>
+    <>
+      {/* Backdrop drawer (mobile saja) */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        style={{ '--sb-width': `${sbWidth}px` } as React.CSSProperties}
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col h-full text-[#F5F5F5] bg-[#09090B] border-r border-[#24242D] w-72 max-w-[85vw] transition-transform duration-300 ease-out md:static md:relative md:z-auto md:w-[var(--sb-width,16rem)] md:max-w-none md:translate-x-0 md:shrink-0 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } ${collapsed ? 'md:hidden' : ''}`}
+      >
+      <div className="p-5 border-b border-[#24242D] flex items-center justify-between gap-2">
+        <Link href="/" className="flex items-center gap-3 min-w-0" onClick={() => setMobileOpen(false)}>
+          <img src="/logo.png" alt="BroAgent Logo" className="w-8 h-8 object-contain rounded-md shrink-0" />
+          <div className="text-xl font-semibold tracking-tight text-[#F5F5F5] truncate">BroAgent</div>
         </Link>
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden p-1.5 text-[#8B8B98] hover:text-[#F5F5F5] hover:bg-[#16161D] rounded-lg transition-colors shrink-0"
+          aria-label="Close menu"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <button
+          onClick={() => setCollapsedPersist(true)}
+          className="hidden md:block p-1.5 text-[#8B8B98] hover:text-[#F5F5F5] hover:bg-[#16161D] rounded-lg transition-colors shrink-0"
+          title="Sembunyikan sidebar"
+          aria-label="Hide sidebar"
+        >
+          <PanelLeftClose className="w-5 h-5" />
+        </button>
       </div>
       
-      <nav className="flex-1 py-4 flex flex-col gap-1 overflow-y-auto px-3">
+      <nav className="flex-1 py-4 flex flex-col gap-1 overflow-y-auto overflow-x-hidden px-3 min-h-0">
         <Link 
           href="/chat"
+          onClick={() => setMobileOpen(false)}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#F5F5F5] hover:bg-[#16161D] transition-colors"
         >
           <MessageSquarePlus className="w-4 h-4 text-[#8B8B98]" />
@@ -179,7 +322,7 @@ export default function Sidebar() {
                   </div>
                 ) : (
                   <>
-                    <Link href={`/chat?conversationId=${conv.id}`} className="block flex-1 text-sm text-[#8B8B98] hover:text-[#F5F5F5] truncate transition-colors">
+                    <Link href={`/chat?conversationId=${conv.id}`} onClick={() => setMobileOpen(false)} className="block flex-1 min-w-0 text-sm text-[#8B8B98] hover:text-[#F5F5F5] truncate transition-colors">
                       {conv.title || 'Conversation'}
                     </Link>
                     <div className="hidden group-hover:flex items-center gap-1.5 absolute right-2 bg-[#111116] pl-2">
@@ -206,8 +349,8 @@ export default function Sidebar() {
           <div className="mt-6 px-3 text-center">
             <p className="text-xs text-[#8B8B98] mb-3">{tt('chat.loginToSave')}</p>
             <div className="flex flex-col gap-2">
-              <Link href="/login" className="text-sm bg-[#16161D] hover:bg-[#24242D] text-[#F5F5F5] py-2 rounded-lg transition-colors">{tt('auth.login')}</Link>
-              <Link href="/register" className="text-sm text-[#8B8B98] hover:text-[#F5F5F5] py-1">{tt('auth.register')}</Link>
+              <Link href="/login" onClick={() => setMobileOpen(false)} className="text-sm bg-[#16161D] hover:bg-[#24242D] text-[#F5F5F5] py-2 rounded-lg transition-colors">{tt('auth.login')}</Link>
+              <Link href="/register" onClick={() => setMobileOpen(false)} className="text-sm text-[#8B8B98] hover:text-[#F5F5F5] py-1">{tt('auth.register')}</Link>
             </div>
           </div>
         )}
@@ -243,11 +386,11 @@ export default function Sidebar() {
       {/* Modal konfirmasi hapus history */}
       {deleteTarget && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 sm:p-4"
           onClick={() => { if (!deleting) setDeleteTarget(null); }}
         >
           <div
-            className="w-full max-w-sm bg-[#111116] border border-[#24242D] rounded-2xl shadow-2xl p-5"
+            className="w-full max-w-sm bg-[#111116] border border-[#24242D] rounded-2xl shadow-2xl p-4 sm:p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2.5 mb-2">
@@ -279,6 +422,17 @@ export default function Sidebar() {
           </div>
         </div>
       )}
-    </aside>
+      {/* Gagang geser lebar sidebar (laptop saja, double-click = reset) */}
+      <div
+        onPointerDown={startResize}
+        onDoubleClick={resetWidth}
+        title="Geser untuk ubah lebar • double-click untuk reset"
+        className="hidden md:block absolute top-0 right-[-5px] w-[10px] h-full cursor-ew-resize z-10 group/handle"
+        aria-hidden="true"
+      >
+        <div className="absolute top-0 right-[4px] w-[2px] h-full bg-transparent group-hover/handle:bg-indigo-500/60 transition-colors" />
+      </div>
+      </aside>
+    </>
   );
 }

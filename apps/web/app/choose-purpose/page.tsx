@@ -88,11 +88,11 @@ export default function ChoosePurposePage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] text-slate-200 p-6">
-      <div className="w-full max-w-2xl bg-[#12121a] border border-[#2e2e3d] rounded-2xl p-8">
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] text-slate-200 p-4 sm:p-6 overflow-x-clip">
+      <div className="w-full max-w-2xl bg-[#12121a] border border-[#2e2e3d] rounded-2xl p-5 sm:p-8">
         <div className="flex items-center gap-3 mb-2">
-          <img src="/logo.png" alt="BroAgent" className="w-10 h-10 object-contain" />
-          <h1 className="text-2xl font-bold">{t(uiLang, 'purpose.title')}</h1>
+          <img src="/logo.png" alt="BroAgent" className="w-9 h-9 sm:w-10 sm:h-10 object-contain shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-bold leading-snug">{t(uiLang, 'purpose.title')}</h1>
         </div>
         <p className="text-sm text-slate-400 mb-6">{t(uiLang, 'purpose.desc')}</p>
 

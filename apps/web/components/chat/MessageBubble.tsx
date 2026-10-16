@@ -41,10 +41,10 @@ export default function MessageBubble({
 
   if (isUser) {
     return (
-      <div className="flex w-full justify-end">
-        <div className="max-w-[85%] md:max-w-[75%] flex gap-3 flex-row-reverse">
-          <div className="flex flex-col gap-1 items-end">
-            <div className="px-4 py-3 rounded-2xl text-[15px] leading-relaxed whitespace-pre-wrap bg-[#16161D] text-[#F5F5F5] rounded-tr-sm">
+      <div className="flex w-full justify-end min-w-0">
+        <div className="max-w-[92%] sm:max-w-[85%] md:max-w-[75%] flex gap-3 flex-row-reverse min-w-0">
+          <div className="flex flex-col gap-1 items-end min-w-0">
+            <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-2xl text-sm sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-[#16161D] text-[#F5F5F5] rounded-tr-sm min-w-0">
               {message.content}
             </div>
           </div>
@@ -100,7 +100,7 @@ function SourcesList({ sources }: { sources: ChatSource[] }) {
   if (clean.length === 0) return null;
 
   return (
-    <div className="mt-2 w-full rounded-xl border border-[#24242D] bg-[#0e0e14] px-3 py-2">
+    <div className="mt-2 w-full min-w-0 rounded-xl border border-[#24242D] bg-[#0e0e14] px-3 py-2">
       <div className="flex items-center gap-1.5 pb-1.5">
         <Globe className="w-3.5 h-3.5 text-[#8B8B98]" />
         <span className="text-[11px] uppercase tracking-wide text-[#8B8B98]">
@@ -189,14 +189,14 @@ function AiBubble({  message,
   // Thinking/streaming: satu logo + status aktivitas, TANPA aksi dan TANPA divider.
   if (!hasContent && !editing) {
     return (
-      <div className="flex w-full justify-start">
-        <div className="w-full flex gap-3 flex-row min-w-0">
+      <div className="flex w-full justify-start min-w-0">
+        <div className="w-full flex gap-2.5 sm:gap-3 flex-row min-w-0">
           <div className="w-8 h-8 rounded-full bg-[#111116] border border-[#24242D] flex items-center justify-center shrink-0 mt-1">
             <img src="/logo.png" alt="AI" className="w-5 h-5 object-contain" />
           </div>
-          <div className="flex items-center gap-2.5 min-h-[2.5rem] py-2" aria-live="polite">
+          <div className="flex items-center gap-2.5 min-h-[2.5rem] py-2 min-w-0" aria-live="polite">
             <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse shrink-0" />
-            <span className="text-sm text-[#8B8B98]">{statusText}</span>
+            <span className="text-sm text-[#8B8B98] truncate">{statusText}</span>
           </div>
         </div>
       </div>
@@ -204,15 +204,15 @@ function AiBubble({  message,
   }
 
   return (
-    <div className="flex w-full justify-start">
-      <div className="max-w-[85%] md:max-w-[75%] w-full flex gap-3 flex-row min-w-0">
-        <div className="w-8 h-8 rounded-full bg-[#111116] border border-[#24242D] flex items-center justify-center shrink-0 mt-1">
-          <img src="/logo.png" alt="AI" className="w-5 h-5 object-contain" />
+    <div className="flex w-full justify-start min-w-0">
+      <div className="w-full max-w-[calc(100%-0px)] sm:max-w-[95%] md:max-w-[75%] flex gap-2.5 sm:gap-3 flex-row min-w-0">
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#111116] border border-[#24242D] flex items-center justify-center shrink-0 mt-1">
+          <img src="/logo.png" alt="AI" className="w-4 h-4 sm:w-5 sm:h-5 object-contain" />
         </div>
 
         <div className="flex flex-col gap-1 items-start min-w-0 flex-1">
           <div
-            className={`w-full px-4 py-3 rounded-2xl text-[15px] leading-relaxed ${
+            className={`w-full min-w-0 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-2xl text-sm sm:text-[15px] leading-relaxed break-words ${
               document ? 'bg-[#0e0e14] border border-[#24242D]' : 'text-[#F5F5F5]'
             }`}
           >

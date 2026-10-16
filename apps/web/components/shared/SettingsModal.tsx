@@ -408,14 +408,14 @@ export default function SettingsModal({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 p-3 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-[#111116] border border-[#24242D] rounded-2xl shadow-2xl"
+        className="w-full max-w-lg max-h-[92dvh] sm:max-h-[85vh] overflow-y-auto overflow-x-hidden bg-[#111116] border border-[#24242D] rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#24242D] sticky top-0 bg-[#111116]">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-[#24242D] sticky top-0 bg-[#111116] z-10">
           <h2 className="text-base font-semibold text-[#F5F5F5]">{tr(uiLang, 'settings.title')}</h2>
           <button
             onClick={onClose}
@@ -426,7 +426,7 @@ export default function SettingsModal({ open, onClose }: Props) {
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-6">
+        <div className="px-4 sm:px-5 py-4 space-y-6">
           {/* ── Profil ─────────────────────────────── */}
           <section>
             <h3 className="text-xs uppercase tracking-wide text-[#8B8B98] mb-2">{tr(uiLang, 'settings.profile')}</h3>
@@ -527,18 +527,18 @@ export default function SettingsModal({ open, onClose }: Props) {
                 </div>
 
                 {/* Statistik */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-[#09090B] border border-[#24242D] rounded-xl p-2.5 text-center">
-                    <div className="text-lg font-bold text-[#F5F5F5]">{stats ? stats.conversations : '…'}</div>
-                    <div className="text-[11px] text-[#8B8B98]">{tr(uiLang, 'settings.conversations')}</div>
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className="bg-[#09090B] border border-[#24242D] rounded-xl p-2 sm:p-2.5 text-center min-w-0">
+                    <div className="text-base sm:text-lg font-bold text-[#F5F5F5] truncate">{stats ? stats.conversations : '…'}</div>
+                    <div className="text-[10px] sm:text-[11px] text-[#8B8B98] leading-tight">{tr(uiLang, 'settings.conversations')}</div>
                   </div>
-                  <div className="bg-[#09090B] border border-[#24242D] rounded-xl p-2.5 text-center">
-                    <div className="text-lg font-bold text-[#F5F5F5]">{stats ? stats.messages : '…'}</div>
-                    <div className="text-[11px] text-[#8B8B98]">{tr(uiLang, 'settings.messages')}</div>
+                  <div className="bg-[#09090B] border border-[#24242D] rounded-xl p-2 sm:p-2.5 text-center min-w-0">
+                    <div className="text-base sm:text-lg font-bold text-[#F5F5F5] truncate">{stats ? stats.messages : '…'}</div>
+                    <div className="text-[10px] sm:text-[11px] text-[#8B8B98] leading-tight">{tr(uiLang, 'settings.messages')}</div>
                   </div>
-                  <div className="bg-[#09090B] border border-[#24242D] rounded-xl p-2.5 text-center">
-                    <div className="text-lg font-bold text-[#F5F5F5]">{activeDays(user.createdAt || stats?.memberSince)}</div>
-                    <div className="text-[11px] text-[#8B8B98]">{tr(uiLang, 'settings.daysActive')}</div>
+                  <div className="bg-[#09090B] border border-[#24242D] rounded-xl p-2 sm:p-2.5 text-center min-w-0">
+                    <div className="text-base sm:text-lg font-bold text-[#F5F5F5] truncate">{activeDays(user.createdAt || stats?.memberSince)}</div>
+                    <div className="text-[10px] sm:text-[11px] text-[#8B8B98] leading-tight">{tr(uiLang, 'settings.daysActive')}</div>
                   </div>
                 </div>
 
