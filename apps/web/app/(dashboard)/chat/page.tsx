@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, Suspense, useRef } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import ChatWindow from '@/components/chat/ChatWindow';
 import ChatInput from '@/components/chat/ChatInput';
 import { MAX_DOCS_PER_MESSAGE, MAX_IMAGES_PER_MESSAGE, OutgoingAttachment } from '@/lib/attachments';
-import { ChevronDown, GraduationCap, Microscope, Lightbulb, FileText, LifeBuoy, Zap, Cpu, Check, OctagonAlert, ArrowRightLeft, Menu } from 'lucide-react';
+import { ChevronDown, GraduationCap, Microscope, Lightbulb, FileText, LifeBuoy, Zap, Cpu, Check, OctagonAlert, ArrowRightLeft, Menu, LogIn } from 'lucide-react';
 import { PREF_KEYS } from '@/components/shared/SettingsModal';
 import { getStoredLang, getStoredPurpose, normalizePurpose, purposeDefaultMode, setStoredPurpose, sttForLang, syncLangFromServer, tx, useAppLanguage } from '@/lib/i18n';
 
@@ -106,6 +107,18 @@ function ChatPageContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // User login (null = tamu). Dipakai buat tombol login navbar + banner ajakan.
+  const [me, setMe] = useState<any>(null);
+  const [meLoaded, setMeLoaded] = useState(false);
+  // Banner ajakan login bisa di-skip (ingat pilihan biar nggak nagih terus).
+  const [nudgeSkipped, setNudgeSkipped] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return localStorage.getItem('bro-login-nudge-dismissed') === '1';
+      } catch { return false; }
+    }
+    return false;
+  });
   // Logo limit: muncul saat kuota habis / terjadi pindah model otomatis.
   const [limitBadge, setLimitBadge] = useState<{ kind: 'limit' | 'fallback'; text: string } | null>(null);
   const [sttLang, setSttLang] = useState<string>(() => {
@@ -168,8 +181,10 @@ function ChatPageContent() {
         const serverPurpose = normalizePurpose(data?.user?.purpose);
         if (serverPurpose) setStoredPurpose(serverPurpose);
         setSttLang(sttForLang(getStoredLang()));
+        setMe(data?.user || null);
       })
-      .catch(() => { /* guest — pakai bahasa lokal */ });
+      .catch(() => { /* guest — pakai bahasa lokal */ })
+      .finally(() => setMeLoaded(true));
   }, []);
 
   // Terapkan preferensi dari Settings modal secara live (tanpa reload).
@@ -263,6 +278,14 @@ function ChatPageContent() {
     const params = new URLSearchParams(searchParams.toString());
     params.set('model', newModel);
     router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  // Tamu pencet Skip di banner ajakan login — ingat biar nggak nagih terus.
+  const skipNudge = () => {
+    setNudgeSkipped(true);
+    try {
+      localStorage.setItem('bro-login-nudge-dismissed', '1');
+    } catch { /* abaikan */ }
   };
 
   const activeModeObj = AVAILABLE_MODES.find(m => m.value === (mode || 'general')) || AVAILABLE_MODES[0]!;
@@ -575,8 +598,45 @@ function ChatPageContent() {
             </span>
           )}
           {error && <span className="text-red-400 text-sm hidden md:inline max-w-[300px] truncate" title={error}>{error}</span>}
+          {meLoaded && !me && (
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
+            >
+              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              {tt('auth.login')}
+            </Link>
+          )}
         </div>
       </header>
+
+      {/* Banner ajakan login buat tamu: chat biar kesimpan. Pilihan: Login / Skip. */}
+      {meLoaded && !me && !nudgeSkipped && (
+        <div className="shrink-0 px-3 sm:px-4 pt-2 sm:pt-3">
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2.5 sm:px-4 sm:py-3">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <span className="p-1.5 rounded-lg bg-indigo-500/20 shrink-0">
+                <LogIn className="w-4 h-4 text-indigo-300" />
+              </span>
+              <p className="text-xs sm:text-sm text-slate-300 min-w-0">{tt('chat.loginToSave')}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 pl-9 sm:pl-0">
+              <Link
+                href="/login"
+                className="px-3.5 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold transition-colors"
+              >
+                {tt('auth.login')}
+              </Link>
+              <button
+                onClick={skipNudge}
+                className="px-3.5 py-1.5 rounded-full border border-[#2e2e3d] text-slate-400 hover:text-slate-200 hover:border-[#8B8B98] text-xs sm:text-sm transition-colors"
+              >
+                {tt('chat.noLimit')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         <ChatWindow

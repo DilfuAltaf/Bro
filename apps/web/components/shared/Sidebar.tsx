@@ -345,15 +345,7 @@ export default function Sidebar() {
               </div>
             ))}
           </div>
-        ) : (
-          <div className="mt-6 px-3 text-center">
-            <p className="text-xs text-[#8B8B98] mb-3">{tt('chat.loginToSave')}</p>
-            <div className="flex flex-col gap-2">
-              <Link href="/login" onClick={() => setMobileOpen(false)} className="text-sm bg-[#16161D] hover:bg-[#24242D] text-[#F5F5F5] py-2 rounded-lg transition-colors">{tt('auth.login')}</Link>
-              <Link href="/register" onClick={() => setMobileOpen(false)} className="text-sm text-[#8B8B98] hover:text-[#F5F5F5] py-1">{tt('auth.register')}</Link>
-            </div>
-          </div>
-        )}
+        ) : null}
       </nav>
       
       <div className="p-3 border-t border-[#24242D] space-y-1">
